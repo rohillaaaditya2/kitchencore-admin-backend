@@ -39,7 +39,8 @@ const sendOTP = async (email, otp) => {
 
 router.post('/signup', async (req, res) => {
   try {
-    const { restaurantName, email, password } = req.body;
+    const { restaurantName, email: rawEmail, password } = req.body;
+    const email = rawEmail.toLowerCase().trim();
     
     let existing = await Restaurant.findOne({ email });
     if (existing) return res.status(400).json({ message: 'Email already exists' });
@@ -97,7 +98,8 @@ router.post('/verify-otp', async (req, res) => {
 
 router.post('/login', async (req, res) => {
     try {
-      const { email, password } = req.body;
+      const { email: rawEmail, password } = req.body;
+      const email = rawEmail.toLowerCase().trim();
       const restaurant = await Restaurant.findOne({ email });
   
       if (!restaurant || !(await restaurant.comparePassword(password))) {
