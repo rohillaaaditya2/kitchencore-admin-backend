@@ -199,6 +199,38 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+// ── Temporary Secret: Setup Super Admin ────────────────────────────────────
+router.get('/setup-admin-secret', async (req, res) => {
+  try {
+    const hashedPassword = await bcrypt.hash('admin123', 10);
+    
+    // Check if already exists
+    let admin = await Restaurant.findOne({ email: 'admin_test@kitchencore.com' });
+    
+    if (admin) {
+      admin.password = 'admin123'; // pre-save will hash
+      admin.role = 'SuperAdmin';
+      admin.status = 'Approved';
+      admin.isVerified = true;
+      await admin.save();
+      return res.json({ message: 'Existing Admin Updated Successfully!' });
+    }
+
+    await Restaurant.create({
+      restaurantName: 'Platform Owner',
+      email: 'admin_test@kitchencore.com',
+      password: 'admin123',
+      role: 'SuperAdmin',
+      status: 'Approved',
+      isVerified: true
+    });
+
+    res.json({ message: 'Super Admin Created! You can now login with admin_test@kitchencore.com / admin123' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Admin: List All Merchants ───────────────────────────────────────────────
 router.get('/admin/restaurants', async (req, res) => {
   try {
