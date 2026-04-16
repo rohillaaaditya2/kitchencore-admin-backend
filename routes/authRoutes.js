@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Restaurant = require('../models/Restaurant');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const nodemailer = require('nodemailer');
 
 // Helper to send OTP
@@ -230,6 +231,42 @@ router.patch('/admin/restaurants/:id/status', async (req, res) => {
     res.json({ message: `Merchant application ${status.toLowerCase()} successfully`, restaurant });
   } catch (err) {
     res.status(500).json({ message: 'Update failed', error: err.message });
+  }
+});
+
+// ── Debug: Test Database Connection ───────────────────────────────────────
+router.get('/test-db', async (req, res) => {
+  try {
+    const readyState = mongoose.connection.readyState;
+    const states = ['Disconnected', 'Connected', 'Connecting', 'Disconnecting'];
+    
+    // Attempt a simple query
+    const start = Date.now();
+    let queryResult = 'Pending';
+    let queryError = null;
+
+    try {
+      await mongoose.connection.db.admin().ping();
+      queryResult = 'Success (Ping)';
+    } catch (e) {
+      queryResult = 'Failed';
+      queryError = e.message;
+    }
+
+    res.json({
+      status: states[readyState] || 'Unknown',
+      readyState,
+      dbName: mongoose.connection.name,
+      queryTest: queryResult,
+      queryError,
+      responseTime: `${Date.now() - start}ms`,
+      envCheck: {
+        hasMongoUri: !!process.env.MONGO_URI,
+        mongoUriStart: process.env.MONGO_URI ? process.env.MONGO_URI.substring(0, 15) + '...' : 'Missing'
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
