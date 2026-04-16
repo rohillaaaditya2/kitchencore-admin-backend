@@ -257,6 +257,7 @@ router.get('/test-db', async (req, res) => {
       status: states[readyState] || 'Unknown',
       readyState,
       dbName: mongoose.connection.name,
+      connectionError: global.mongoConnError || 'None',
       queryTest: queryResult,
       queryError,
       responseTime: `${Date.now() - start}ms`,

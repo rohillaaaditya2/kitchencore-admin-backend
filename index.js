@@ -27,14 +27,21 @@ app.use('/api/promos', promoRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/platform-config', platformConfigRoutes);
 
+// Global to track connection error for debugging
+global.mongoConnError = null;
+
 // Connect to MongoDB Atlas
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/pizzatown')
   .then(() => {
     console.log('Connected to MongoDB');
+    global.mongoConnError = null;
     // Start the auto-status sweep task
     startAutoStatusSweep();
   })
-  .catch(err => console.error('MongoDB connection error:', err));
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    global.mongoConnError = err.message;
+  });
 
 // Auto-fulfillment sweep logic
 const Order = require('./models/Order');
