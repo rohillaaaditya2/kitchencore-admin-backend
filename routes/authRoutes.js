@@ -100,22 +100,53 @@ router.post('/login', async (req, res) => {
     try {
       const { email: rawEmail, password } = req.body;
       const email = rawEmail.toLowerCase().trim();
+      console.log(`[LOGIN ATTEMPT] Email: ${email}`);
       const restaurant = await Restaurant.findOne({ email });
   
-      if (!restaurant || !(await restaurant.comparePassword(password))) {
+      if (!restaurant) {
+        console.log(`[LOGIN FAILED] No account found for email: ${email}`);
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      const isMatch = await restaurant.comparePassword(password);
+      console.log(`[LOGIN DEBUG] Account Found: ${restaurant.role}, Pass Match: ${isMatch}`);
+
+      if (!isMatch) {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
   
+      if (!restaurant.isActive) {
+        return res.status(403).json({ message: 'Your subscription is currently inactive. Please contact support.' });
+      }
+
       if (!restaurant.isVerified) {
         return res.status(401).json({ message: 'Account not verified. Check email.' });
       }
 
       // Check Approval Status
-      if (restaurant.status === 'Pending') {
-        return res.status(403).json({ message: 'Your application is under review. Please wait for admin approval.' });
+      if (restaurant.role !== 'SuperAdmin') {
+        if (restaurant.status === 'Pending') {
+          return res.status(403).json({ message: 'Your application is under review. Please wait for admin approval.' });
+        }
+        if (restaurant.status === 'Rejected') {
+          return res.status(403).json({ message: 'Your application has been rejected. Contact support for details.' });
+        }
       }
-      if (restaurant.status === 'Rejected') {
-        return res.status(403).json({ message: 'Your application has been rejected. Contact support for details.' });
+
+      // ── SUPER ADMIN 2FA OTP ──────────────────────────────────────────────
+      if (restaurant.role === 'SuperAdmin') {
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        restaurant.otp = otp;
+        restaurant.otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+        await restaurant.save();
+
+        try {
+          await sendOTP(email, otp);
+          return res.status(200).json({ requireOTP: true, email });
+        } catch (mailErr) {
+          console.error('Admin OTP mail error:', mailErr);
+          return res.status(200).json({ requireOTP: true, email, message: 'OTP generated but email failed. Check logs.' });
+        }
       }
   
       const token = jwt.sign(
@@ -127,6 +158,40 @@ router.post('/login', async (req, res) => {
     } catch (error) {
       res.status(500).json({ message: 'Login failed', error: error.message });
     }
+});
+
+// ── Admin: Verify Login OTP ────────────────────────────────────────────────
+router.post('/admin/login-verify', async (req, res) => {
+  try {
+    const { email: rawEmail, password, otp } = req.body;
+    const email = rawEmail.toLowerCase().trim();
+    const restaurant = await Restaurant.findOne({ email });
+
+    if (!restaurant || restaurant.role !== 'SuperAdmin') {
+      return res.status(401).json({ message: 'Unauthorized access' });
+    }
+
+    if (!(await restaurant.comparePassword(password))) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    if (restaurant.otp !== otp) return res.status(400).json({ message: 'Invalid OTP' });
+    if (restaurant.otpExpiry < new Date()) return res.status(400).json({ message: 'OTP Expired' });
+
+    // Success - Clear OTP and issue token
+    restaurant.otp = null;
+    restaurant.otpExpiry = null;
+    await restaurant.save();
+
+    const token = jwt.sign(
+      { id: restaurant._id, role: restaurant.role, status: restaurant.status }, 
+      process.env.JWT_SECRET || 'secret', 
+      { expiresIn: '1d' }
+    );
+    res.status(200).json({ token, restaurant });
+  } catch (err) {
+    res.status(500).json({ message: 'Login verification failed', error: err.message });
+  }
 });
 
 // ── Forgot Password: Send OTP ────────────────────────────────────────────────
@@ -205,30 +270,33 @@ router.post('/reset-password', async (req, res) => {
 // ── Temporary Secret: Setup Super Admin ────────────────────────────────────
 router.get('/setup-admin-secret', async (req, res) => {
   try {
-    const hashedPassword = await bcrypt.hash('admin123', 10);
+    const userEmail = 'aadityarohilla668@gmail.com';
+    const userPass = 'Aaditya@123';
     
-    // Check if already exists
-    let admin = await Restaurant.findOne({ email: 'admin_test@kitchencore.com' });
-    
-    if (admin) {
-      admin.password = 'admin123'; // pre-save will hash
-      admin.role = 'SuperAdmin';
-      admin.status = 'Approved';
-      admin.isVerified = true;
-      await admin.save();
-      return res.json({ message: 'Existing Admin Updated Successfully!' });
-    }
+    // Clean up any existing record first to ensure fresh password hashing
+    await Restaurant.deleteOne({ email: userEmail });
+
+    // Explicitly hash password to ensure consistency
+    const hashedPassword = await bcrypt.hash(userPass, 10);
+    console.log(`[SETUP ADMIN] Creating fresh admin for ${userEmail}`);
 
     await Restaurant.create({
       restaurantName: 'Platform Owner',
-      email: 'admin_test@kitchencore.com',
-      password: 'admin123',
+      email: userEmail,
+      password: userPass, // Still passing raw because pre('save') will hash it, but let's check if we should pass hashed?
+      // Actually, if I pass 'password: hashedPassword', then pre('save') will hash the ALREADY hashed password IF it thinks it's modified.
+      // In Restaurant.js: if (!this.isModified('password')) return;
+      // In .create(), it WILL be modified.
+      // So I should EITHER let .create handle it (like it was) OR pass it differently.
+      // Let's stick to raw but add a log in Restaurant.js pre-save if needed.
+      // Better: In setup route, let's just use raw but ensure we delete then create fresh.
       role: 'SuperAdmin',
       status: 'Approved',
-      isVerified: true
+      isVerified: true,
+      isActive: true
     });
 
-    res.json({ message: 'Super Admin Created! You can now login with admin_test@kitchencore.com / admin123' });
+    res.json({ message: `Master Admin Created! You can now login with ${userEmail} / ${userPass}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -265,6 +333,21 @@ router.patch('/admin/restaurants/:id/status', async (req, res) => {
     res.json({ message: `Merchant application ${status.toLowerCase()} successfully`, restaurant });
   } catch (err) {
     res.status(500).json({ message: 'Update failed', error: err.message });
+  }
+});
+
+// ── Admin: Toggle Merchant Active Status ───────────────────────────────
+router.patch('/admin/restaurants/:id/toggle-active', async (req, res) => {
+  try {
+    const restaurant = await Restaurant.findById(req.params.id);
+    if (!restaurant) return res.status(404).json({ message: 'Merchant not found' });
+
+    restaurant.isActive = !restaurant.isActive;
+    await restaurant.save();
+
+    res.json({ message: `Merchant is now ${restaurant.isActive ? 'Active' : 'Inactive'}`, restaurant });
+  } catch (err) {
+    res.status(500).json({ message: 'Toggle failed', error: err.message });
   }
 });
 

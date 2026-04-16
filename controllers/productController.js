@@ -10,6 +10,13 @@ exports.getAllProducts = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
         return res.status(400).json({ message: 'Invalid Restaurant ID format' });
     }
+
+    // Check if restaurant is active (for subscriptions)
+    const restaurant = await mongoose.model('Restaurant').findById(restaurantId).select('isActive');
+    if (restaurant && restaurant.isActive === false) {
+      return res.status(403).json({ message: 'Merchant account is temporarily inactive' });
+    }
+
     const products = await Product.find({ restaurantId, isAvailable: true });
     res.json(products);
   } catch (error) {

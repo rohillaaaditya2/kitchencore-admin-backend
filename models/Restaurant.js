@@ -18,10 +18,12 @@ const restaurantSchema = new mongoose.Schema({
   },
   otp: { type: String },
   otpExpiry: { type: Date },
+  isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
 restaurantSchema.pre('save', async function() {
   if (!this.isModified('password')) return;
+  console.log(`[MODEL DEBUG] Hashing password for: ${this.email}`);
   this.password = await bcrypt.hash(this.password, 10);
 });
 
