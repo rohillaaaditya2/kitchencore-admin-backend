@@ -11,13 +11,21 @@ exports.getAllProducts = async (req, res) => {
         return res.status(400).json({ message: 'Invalid Restaurant ID format' });
     }
 
-    // Check if restaurant is active (for subscriptions)
-    const restaurant = await mongoose.model('Restaurant').findById(restaurantId).select('isActive');
-    if (restaurant && restaurant.isActive === false) {
-      return res.status(403).json({ message: 'Merchant account is temporarily inactive' });
+    // If admin=true query param is passed (from AdminPanel), show all products
+    const isAdminView = req.query.admin === 'true';
+
+    if (!isAdminView) {
+      // Public view: check if restaurant is active
+      const restaurant = await mongoose.model('Restaurant').findById(restaurantId).select('isActive');
+      if (restaurant && restaurant.isActive === false) {
+        return res.status(403).json({ message: 'Merchant account is temporarily inactive' });
+      }
     }
 
-    const products = await Product.find({ restaurantId, isAvailable: true });
+    const filter = { restaurantId };
+    if (!isAdminView) filter.isAvailable = true; // Only show available on public menu
+
+    const products = await Product.find(filter);
     res.json(products);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching products', error });
@@ -80,5 +88,19 @@ exports.updateProduct = async (req, res) => {
   } catch (error) {
     console.error('Update product error:', error);
     res.status(500).json({ message: 'Error updating product', error });
+  }
+};
+// Toggle product availability (Admin only)
+exports.toggleAvailability = async (req, res) => {
+  try {
+    const product = await Product.findOne({ _id: req.params.id, restaurantId: req.restaurantId });
+    if (!product) return res.status(404).json({ message: 'Product not found or unauthorized' });
+
+    product.isAvailable = !product.isAvailable;
+    await product.save();
+
+    res.json({ message: `Product is now ${product.isAvailable ? 'Available' : 'Unavailable'}`, product });
+  } catch (error) {
+    res.status(500).json({ message: 'Error toggling availability', error });
   }
 };
