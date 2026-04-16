@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 // Get all products
 exports.getAllProducts = async (req, res) => {
   try {
-    const { restaurantId } = req.query;
+    const restaurantId = req.query.restaurantId || req.restaurantId;
     if (!restaurantId) return res.status(400).json({ message: 'Restaurant ID is required' });
 
     if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
