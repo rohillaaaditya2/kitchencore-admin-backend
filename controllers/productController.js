@@ -27,6 +27,7 @@ exports.createProduct = async (req, res) => {
       productData.image = `/uploads/${req.file.filename}`;
     }
     
+    if (productData.category) productData.category = productData.category.trim();
     if (productData.price) productData.price = Number(productData.price);
 
     const newProduct = new Product(productData);
