@@ -62,7 +62,12 @@ router.post('/signup', async (req, res) => {
       res.status(201).json({ message: 'Account created, but failed to send OTP. Check logs.', email });
     }
   } catch (error) {
-    res.status(500).json({ message: 'Signup failed', error: error.message });
+    console.error('CRITICAL SIGNUP ERROR:', error);
+    res.status(500).json({ 
+      message: 'Signup failed', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+    });
   }
 });
 
