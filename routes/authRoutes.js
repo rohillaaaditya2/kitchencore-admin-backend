@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Restaurant = require('../models/Restaurant');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 
 // Helper to send OTP
