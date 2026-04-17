@@ -68,8 +68,41 @@ app.patch('/api/demo-requests/:id', adminAuth, async (req, res) => {
 });
 
 // To ensure super admin frontend compatibility using /login
-app.post('/api/login', (req, res) => {
-    res.redirect(307, '/api/auth/login');
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const masterEmail = process.env.SUPER_ADMIN_EMAIL || 'aadityarohilla668@gmail.com';
+    const masterPass = process.env.SUPER_ADMIN_PASSWORD || 'admin123';
+
+    // A. Check Master Credentials (Env Based)
+    if (email === masterEmail && password === masterPass) {
+      const token = jwt.sign(
+        { role: 'SuperAdmin', id: 'master_admin' }, 
+        process.env.JWT_SECRET || 'secret', 
+        { expiresIn: '1d' }
+      );
+      return res.status(200).json({ token, role: 'SuperAdmin' });
+    }
+
+    // B. Check Database for SuperAdmin user
+    const dbAdmin = await Restaurant.findOne({ email: email.toLowerCase().trim(), role: 'SuperAdmin' });
+    if (dbAdmin) {
+      const bcrypt = require('bcryptjs');
+      const isMatch = await bcrypt.compare(password, dbAdmin.password);
+      if (isMatch) {
+        const token = jwt.sign(
+          { role: 'SuperAdmin', id: dbAdmin._id },
+          process.env.JWT_SECRET || 'secret',
+          { expiresIn: '1d' }
+        );
+        return res.status(200).json({ token, role: 'SuperAdmin' });
+      }
+    }
+    
+    res.status(401).json({ message: 'Invalid Super Admin credentials' });
+  } catch (error) {
+    res.status(500).json({ message: 'Login failed', error: error.message });
+  }
 });
 
 const Restaurant = require('./models/Restaurant');
