@@ -27,6 +27,71 @@ app.use('/api/promos', promoRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/platform-config', platformConfigRoutes);
 
+// --- SUPER ADMIN DEMO ROUTES (MERGED) ---
+const DemoRequest = require('./models/DemoRequest');
+const jwt = require('jsonwebtoken');
+
+const adminAuth = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No token' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    if (decoded.role !== 'SuperAdmin') throw new Error();
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(401).json({ message: 'Unauthorized' });
+  }
+};
+
+app.post('/api/demo-request', async (req, res) => {
+  try {
+    const { name, phone, restaurant, city, outletType } = req.body;
+    if (!name || !phone || !restaurant || !city) return res.status(400).json({ message: 'Missing fields' });
+    const demo = await DemoRequest.create({ name, phone, restaurant, city, outletType: outletType || 'Fine Dine' });
+    res.status(201).json({ message: 'Demo saved', demo });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.get('/api/demo-requests', adminAuth, async (req, res) => {
+  try {
+    const demos = await DemoRequest.find().sort({ createdAt: -1 });
+    res.json(demos);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.patch('/api/demo-requests/:id', adminAuth, async (req, res) => {
+  try {
+    const demo = await DemoRequest.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
+    res.json({ demo });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// To ensure super admin frontend compatibility using /login
+app.post('/api/login', (req, res) => {
+    res.redirect(307, '/api/auth/login');
+});
+
+const Restaurant = require('./models/Restaurant');
+app.get('/api/restaurants', adminAuth, async (req, res) => {
+  try {
+    const merchants = await Restaurant.find({}, '-password').sort({ createdAt: -1 });
+    res.json(merchants);
+  } catch (err) { res.status(500).json({ message: 'Failed to fetch merchants', error: err.message }); }
+});
+
+app.patch('/api/restaurant-status', adminAuth, async (req, res) => {
+  try {
+    const { restaurantId, status } = req.body;
+    if (!['Approved', 'Rejected'].includes(status)) return res.status(400).json({ message: 'Invalid status' });
+    const restaurant = await Restaurant.findByIdAndUpdate(restaurantId, { status }, { new: true });
+    if (!restaurant) return res.status(404).json({ message: 'Merchant not found' });
+    res.json({ message: `Merchant application ${status.toLowerCase()} successfully`, restaurant });
+  } catch (err) { res.status(500).json({ message: 'Update failed', error: err.message }); }
+});
+
+
+
 // Connect to MongoDB Atlas
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/pizzatown')
   .then(() => {
