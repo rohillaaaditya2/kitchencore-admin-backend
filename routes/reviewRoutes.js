@@ -6,7 +6,7 @@ const authMiddleware = require('../middleware/auth');
 // Public: Submit a review
 router.post('/', reviewController.createReview);
 
-// Public/Admin (depends on query or token)
-router.get('/', reviewController.getAllReviews);
+// Protected/Admin (depends on query or token)
+router.get('/', authMiddleware, reviewController.getAllReviews);
 
 module.exports = router;
