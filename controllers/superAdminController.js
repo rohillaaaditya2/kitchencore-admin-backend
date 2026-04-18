@@ -81,14 +81,35 @@ exports.getMerchantDetails = async (req, res) => {
     
     const totalRevenue = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
 
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    
+    let currentMonthRevenue = 0;
+    let previousMonthRevenue = 0;
+    let currentMonthOrders = 0;
+
+    orders.forEach(o => {
+      const d = new Date(o.createdAt);
+      if (d >= currentMonthStart) {
+        currentMonthRevenue += (o.totalAmount || 0);
+        currentMonthOrders++;
+      } else if (d >= previousMonthStart && d < currentMonthStart) {
+        previousMonthRevenue += (o.totalAmount || 0);
+      }
+    });
+
     res.status(200).json({
       restaurant,
       stats: {
         totalOrders: orders.length,
         totalRevenue,
+        currentMonthRevenue,
+        previousMonthRevenue,
+        currentMonthOrders,
         productsCount
       },
-      recentOrders: orders.slice(0, 10)
+      recentOrders: orders.slice(0, 150)
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch details', error: error.message });
