@@ -19,6 +19,9 @@ const restaurantSchema = new mongoose.Schema({
   otp: { type: String },
   otpExpiry: { type: Date },
   isActive: { type: Boolean, default: true },
+  trialEndsAt: { type: Date },
+  subscriptionEndsAt: { type: Date },
+  planType: { type: String, enum: ['month', 'year', 'none'], default: 'none' },
 }, { timestamps: true });
 
 restaurantSchema.pre('save', async function() {

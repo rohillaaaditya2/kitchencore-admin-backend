@@ -1,20 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const Restaurant = require('../models/Restaurant');
+const PlatformConfig = require('../models/PlatformConfig');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 
+// CONFIGURATION: Setup your SMTP provider here
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+
 // Helper to send OTP
 const sendOTP = async (email, otp) => {
-  // CONFIGURATION: Setup your SMTP provider here
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
 
   console.log('--- DEVELOPMENT OTP ---');
   console.log(`Email: ${email}`);
@@ -48,12 +50,18 @@ router.post('/signup', async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString(); // Secure 6-digit random OTP
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
 
+    // Get trial duration from platform config
+    const config = await PlatformConfig.findOne();
+    const trialDays = config ? config.freeTrialDays : 14;
+    const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+
     const restaurant = await Restaurant.create({
       restaurantName,
       email,
       password,
       otp,
-      otpExpiry
+      otpExpiry,
+      trialEndsAt
     });
 
     try {
@@ -212,10 +220,7 @@ router.post('/forgot-password', async (req, res) => {
     console.log(`Email: ${email}  OTP: ${otp}`);
     console.log('--------------------------');
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-    });
+
 
     try {
       await transporter.sendMail({

@@ -1,10 +1,23 @@
 const Order = require('../models/Order');
+const Restaurant = require('../models/Restaurant');
 
 // Create a new order
 exports.createOrder = async (req, res) => {
   try {
     const { items, totalAmount, customerPhone, customerName, tableNumber, diningOption, packagingCharge, promoDiscount, promoCodeUsed, loyaltyDiscount, source, status, paymentStatus, restaurantId } = req.body;
     if (!restaurantId) return res.status(400).json({ message: 'Restaurant ID is required' });
+
+    // SUBSCRIPTION CHECK
+    const restaurant = await Restaurant.findById(restaurantId);
+    if (restaurant && restaurant.role !== 'SuperAdmin') {
+      const now = new Date();
+      const trialActive = restaurant.trialEndsAt && restaurant.trialEndsAt > now;
+      const subActive = restaurant.subscriptionEndsAt && restaurant.subscriptionEndsAt > now;
+      if (!trialActive && !subActive) {
+        return res.status(402).json({ message: 'This restaurant\'s service is temporarily suspended due to expired subscription.' });
+      }
+    }
+
     const orderId = req.body.orderId || Math.floor(1000 + Math.random() * 9000).toString();
     
     const newOrder = new Order({

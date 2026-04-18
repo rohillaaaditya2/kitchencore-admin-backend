@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productController');
 const authMiddleware = require('../middleware/auth');
+const billingMiddleware = require('../middleware/billing');
 const multer = require('multer');
 const path = require('path');
 
@@ -21,9 +22,9 @@ const upload = multer({ storage: storage });
 router.get('/', productController.getAllProducts);
 
 // Protected: Admin actions
-router.post('/', authMiddleware, upload.single('imageFile'), productController.createProduct);
-router.patch('/:id/availability', authMiddleware, productController.toggleAvailability);
-router.patch('/:id', authMiddleware, upload.single('imageFile'), productController.updateProduct);
-router.delete('/:id', authMiddleware, productController.deleteProduct);
+router.post('/', authMiddleware, billingMiddleware, upload.single('imageFile'), productController.createProduct);
+router.patch('/:id/availability', authMiddleware, billingMiddleware, productController.toggleAvailability);
+router.patch('/:id', authMiddleware, billingMiddleware, upload.single('imageFile'), productController.updateProduct);
+router.delete('/:id', authMiddleware, billingMiddleware, productController.deleteProduct);
 
 module.exports = router;

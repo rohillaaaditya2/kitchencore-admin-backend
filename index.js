@@ -11,6 +11,10 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const promoRoutes = require('./routes/promoRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const platformConfigRoutes = require('./routes/platformConfigRoutes');
+const waiterRoutes = require('./routes/waiterRoutes');
+const billingRoutes = require('./routes/billingRoutes');
+const superAdminRoutes = require('./routes/superAdminRoutes');
+const billingMiddleware = require('./middleware/billing');
 
 const path = require('path');
 const app = express();
@@ -23,9 +27,12 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', settingsRoutes);
-app.use('/api/promos', promoRoutes);
+app.use('/api/promos', billingMiddleware, promoRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/platform-config', platformConfigRoutes);
+app.use('/api/waiter-requests', waiterRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/super-admin', superAdminRoutes);
 
 // --- SUPER ADMIN DEMO ROUTES (MERGED) ---
 const DemoRequest = require('./models/DemoRequest');
@@ -129,8 +136,10 @@ app.patch('/api/restaurant-status', adminAuth, async (req, res) => {
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/pizzatown')
   .then(() => {
     console.log('Connected to MongoDB');
-    // Start the auto-status sweep task
-    startAutoStatusSweep();
+    // Start the auto-status sweep task only if not on Vercel
+    if (!process.env.VERCEL) {
+      startAutoStatusSweep();
+    }
   })
   .catch(err => console.error('MongoDB connection error:', err));
 

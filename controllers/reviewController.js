@@ -27,7 +27,12 @@ exports.getAllReviews = async (req, res) => {
     const restaurantId = req.restaurantId || req.query.restaurantId;
     if (!restaurantId) return res.status(400).json({ message: 'Restaurant ID is required' });
 
-    const reviews = await Review.find({ restaurantId }).sort({ createdAt: -1 });
+    if (restaurantId !== 'master_admin' && !mongoose.Types.ObjectId.isValid(restaurantId)) {
+        return res.status(400).json({ message: 'Valid Restaurant ID is required' });
+    }
+
+    const query = restaurantId === 'master_admin' ? {} : { restaurantId };
+    const reviews = await Review.find(query).sort({ createdAt: -1 });
     res.status(200).json(reviews);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching reviews', error });
