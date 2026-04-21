@@ -22,7 +22,7 @@ const orderSchema = new mongoose.Schema({
   promoCodeUsed: { type: String, default: null },
   promoDiscount: { type: Number, default: 0 },
   loyaltyDiscount: { type: Number, default: 0 },
-  source: { type: String, enum: ['Direct', 'Zomato', 'Swiggy'], default: 'Direct' },
+  source: { type: String, enum: ['Direct', 'Zomato', 'Swiggy', 'POS'], default: 'Direct' },
   restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true }
 }, { timestamps: true });
 
