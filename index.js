@@ -15,6 +15,7 @@ const waiterRoutes = require('./routes/waiterRoutes');
 const billingRoutes = require('./routes/billingRoutes');
 const superAdminRoutes = require('./routes/superAdminRoutes');
 const customerRoutes = require('./routes/customerRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const billingMiddleware = require('./middleware/billing');
 
 const path = require('path');
@@ -35,6 +36,7 @@ app.use('/api/waiter-requests', waiterRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/super-admin', superAdminRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // --- SUPER ADMIN DEMO ROUTES (MERGED) ---
 const DemoRequest = require('./models/DemoRequest');
@@ -170,6 +172,13 @@ function startAutoStatusSweep() {
 }
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
+const http = require('http');
+const server = http.createServer(app);
+const socketIO = require('./socket');
+
+// Initialize Socket.io
+socketIO.init(server);
+
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT} (accessible on local network)`);
 });

@@ -13,5 +13,6 @@ router.get('/', authMiddleware, billingMiddleware, orderController.getAllOrders)
 router.patch('/:id/status', authMiddleware, billingMiddleware, orderController.updateOrderStatus);
 router.patch('/:id/accept', authMiddleware, billingMiddleware, orderController.acceptOrder);
 router.patch('/:id/preptime', authMiddleware, billingMiddleware, orderController.updateOrderPrepTime);
+router.patch('/:id/payment', authMiddleware, billingMiddleware, orderController.updatePaymentStatus);
 
 module.exports = router;

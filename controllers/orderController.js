@@ -1,6 +1,7 @@
 const Order = require('../models/Order');
 const Restaurant = require('../models/Restaurant');
 const Customer = require('../models/Customer');
+const { sendNotification } = require('../socket');
 
 // Create a new order
 exports.createOrder = async (req, res) => {
@@ -42,9 +43,36 @@ exports.createOrder = async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
+    // Trigger New Order Notification
+    await sendNotification(restaurantId, {
+      type: 'NEW_ORDER',
+      title: 'New Order Received',
+      message: `Order #${orderId} - ₹${totalAmount}`,
+      orderId: savedOrder.orderId
+    });
+
+    // If order is pre-paid (e.g. from external platforms), trigger payment notification
+    if (paymentStatus === 'Paid') {
+      await sendNotification(restaurantId, {
+        type: 'PAYMENT_COMPLETED',
+        title: 'Payment Completed',
+        message: `Payment received for Order #${orderId}`,
+        orderId: savedOrder.orderId
+      });
+    }
+
     // CUSTOMER UPDATE/UPSERT
     if (customerPhone) {
       try {
+        const existingCustomer = await Customer.findOne({ phone: customerPhone, restaurantId });
+        if (!existingCustomer) {
+          // New Customer Notification
+          await sendNotification(restaurantId, {
+            type: 'NEW_CUSTOMER',
+            title: 'New Customer Added',
+            message: `${customerName || 'A new customer'} has been added to your database.`
+          });
+        }
         await Customer.findOneAndUpdate(
           { phone: customerPhone, restaurantId },
           { 
@@ -82,6 +110,15 @@ exports.updateOrderStatus = async (req, res) => {
     
     const updatedOrder = await Order.findOneAndUpdate({ _id: id, restaurantId: req.restaurantId }, { status }, { new: true });
     if (!updatedOrder) return res.status(404).json({ message: 'Order not found' });
+
+    // Trigger Notification
+    await sendNotification(req.restaurantId, {
+      type: 'ORDER_STATUS_UPDATED',
+      title: 'Order Status Updated',
+      message: `Order #${updatedOrder.orderId} status changed to ${status}`,
+      orderId: updatedOrder.orderId
+    });
+
     res.status(200).json(updatedOrder);
   } catch (error) {
     res.status(500).json({ message: 'Error updating status', error });
@@ -138,5 +175,30 @@ exports.getOrdersByPhone = async (req, res) => {
     res.status(200).json(orders);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching orders by phone', error });
+  }
+};
+
+// Update payment status
+exports.updatePaymentStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paymentStatus } = req.body;
+    
+    const updatedOrder = await Order.findOneAndUpdate({ _id: id, restaurantId: req.restaurantId }, { paymentStatus }, { new: true });
+    if (!updatedOrder) return res.status(404).json({ message: 'Order not found' });
+
+    if (paymentStatus === 'Paid') {
+      // Trigger Notification
+      await sendNotification(req.restaurantId, {
+        type: 'PAYMENT_COMPLETED',
+        title: 'Payment Completed',
+        message: `Order #${updatedOrder.orderId} has been paid (₹${updatedOrder.totalAmount})`,
+        orderId: updatedOrder.orderId
+      });
+    }
+
+    res.status(200).json(updatedOrder);
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating payment status', error });
   }
 };
