@@ -77,8 +77,9 @@ exports.getMerchantDetails = async (req, res) => {
     // Fetch the detailed stats for this specific merchant
     const orders = await Order.find({ restaurantId: id }).sort({ createdAt: -1 });
     const Product = require('../models/Product');
-    const productsCount = await Product.countDocuments({ restaurantId: id });
-    
+    const products = await Product.find({ restaurantId: id }).sort({ createdAt: -1 });
+    const productsCount = products.length;
+
     const totalRevenue = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
 
     const now = new Date();
@@ -109,7 +110,8 @@ exports.getMerchantDetails = async (req, res) => {
         currentMonthOrders,
         productsCount
       },
-      recentOrders: orders.slice(0, 150)
+      recentOrders: orders.slice(0, 150),
+      products: products.slice(0, 100)
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch details', error: error.message });

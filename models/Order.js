@@ -12,6 +12,7 @@ const orderSchema = new mongoose.Schema({
   status: { type: String, enum: ['Pending', 'Preparing', 'Served'], default: 'Pending' },
   isAccepted: { type: Boolean, default: false },
   paymentStatus: { type: String, enum: ['Pending', 'Paid'], default: 'Pending' },
+  paymentMethod: { type: String, enum: ['Cash', 'QR', 'Online', 'Other'], default: 'Cash' },
   customerName: { type: String },
   customerPhone: { type: String },
   estimatedPrepTime: { type: Number, default: 15 },

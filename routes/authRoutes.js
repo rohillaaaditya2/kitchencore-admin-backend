@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Restaurant = require('../models/Restaurant');
+const DemoRequest = require('../models/DemoRequest');
 const PlatformConfig = require('../models/PlatformConfig');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
@@ -41,11 +42,42 @@ const sendOTP = async (email, otp) => {
 
 router.post('/signup', async (req, res) => {
   try {
-    const { restaurantName, email: rawEmail, password } = req.body;
+    const { restaurantName, email: rawEmail, password, phone } = req.body;
     const email = rawEmail.toLowerCase().trim();
+    const cleanRestaurantName = restaurantName?.trim();
+    if (!phone) return res.status(400).json({ message: 'Phone number is required' });
+    const cleanPhone = phone?.trim();
     
     let existing = await Restaurant.findOne({ email });
     if (existing) return res.status(400).json({ message: 'Email already exists' });
+
+    // --- RESTRICTED SIGNUP: CHECK FOR DEMO BOOKING ---
+    // User must have booked a demo with matching Restaurant Name and Phone
+    const demoFound = await DemoRequest.findOne({
+      $or: [
+        { phone: cleanPhone },
+        { restaurant: { $regex: new RegExp("^" + cleanRestaurantName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "$", "i") } }
+      ]
+    });
+
+    if (!demoFound) {
+      return res.status(403).json({ 
+        message: 'No demo booking found with these details. Please book a free demo first using your restaurant name and phone number.',
+        noDemo: true 
+      });
+    }
+    // Update: If we want strict matching of BOTH phone and restaurant name together:
+    const strictDemo = await DemoRequest.findOne({
+      phone: cleanPhone,
+      restaurant: { $regex: new RegExp("^" + cleanRestaurantName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "$", "i") }
+    });
+
+    if (!strictDemo) {
+       return res.status(403).json({ 
+         message: 'The Restaurant Name or Phone Number does not match your demo booking. Please use the exact details used during demo booking.',
+         noDemo: true 
+       });
+    }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString(); // Secure 6-digit random OTP
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
@@ -58,6 +90,7 @@ router.post('/signup', async (req, res) => {
     const restaurant = await Restaurant.create({
       restaurantName,
       email,
+      phone,
       password,
       otp,
       otpExpiry,
@@ -312,7 +345,7 @@ router.get('/admin/restaurants', async (req, res) => {
   try {
     // In a real app, you'd verify the JWT and check the role here.
     // For now, we return all merchants as the frontend handles role checks.
-    const merchants = await Restaurant.find({}, '-password').sort({ createdAt: -1 });
+    const merchants = await Restaurant.find({ isVerified: true, role: 'Merchant' }, '-password').sort({ createdAt: -1 });
     res.json(merchants);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch merchants', error: err.message });

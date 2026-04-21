@@ -14,6 +14,7 @@ const platformConfigRoutes = require('./routes/platformConfigRoutes');
 const waiterRoutes = require('./routes/waiterRoutes');
 const billingRoutes = require('./routes/billingRoutes');
 const superAdminRoutes = require('./routes/superAdminRoutes');
+const customerRoutes = require('./routes/customerRoutes');
 const billingMiddleware = require('./middleware/billing');
 
 const path = require('path');
@@ -33,6 +34,7 @@ app.use('/api/platform-config', platformConfigRoutes);
 app.use('/api/waiter-requests', waiterRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/super-admin', superAdminRoutes);
+app.use('/api/customers', customerRoutes);
 
 // --- SUPER ADMIN DEMO ROUTES (MERGED) ---
 const DemoRequest = require('./models/DemoRequest');
@@ -115,7 +117,7 @@ app.post('/api/login', async (req, res) => {
 const Restaurant = require('./models/Restaurant');
 app.get('/api/restaurants', adminAuth, async (req, res) => {
   try {
-    const merchants = await Restaurant.find({}, '-password').sort({ createdAt: -1 });
+    const merchants = await Restaurant.find({ isVerified: true, role: 'Merchant' }, '-password').sort({ createdAt: -1 });
     res.json(merchants);
   } catch (err) { res.status(500).json({ message: 'Failed to fetch merchants', error: err.message }); }
 });

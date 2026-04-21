@@ -1,10 +1,11 @@
 const Order = require('../models/Order');
 const Restaurant = require('../models/Restaurant');
+const Customer = require('../models/Customer');
 
 // Create a new order
 exports.createOrder = async (req, res) => {
   try {
-    const { items, totalAmount, customerPhone, customerName, tableNumber, diningOption, packagingCharge, promoDiscount, promoCodeUsed, loyaltyDiscount, source, status, paymentStatus, restaurantId } = req.body;
+    const { items, totalAmount, customerPhone, customerName, tableNumber, diningOption, packagingCharge, promoDiscount, promoCodeUsed, loyaltyDiscount, source, status, paymentStatus, paymentMethod, restaurantId } = req.body;
     if (!restaurantId) return res.status(400).json({ message: 'Restaurant ID is required' });
 
     // SUBSCRIPTION CHECK
@@ -35,10 +36,28 @@ exports.createOrder = async (req, res) => {
       source: source || 'Direct',
       status: status || 'Pending',
       paymentStatus: paymentStatus || 'Pending',
+      paymentMethod: paymentMethod || 'Cash',
       restaurantId
     });
 
     const savedOrder = await newOrder.save();
+
+    // CUSTOMER UPDATE/UPSERT
+    if (customerPhone) {
+      try {
+        await Customer.findOneAndUpdate(
+          { phone: customerPhone, restaurantId },
+          { 
+            $set: { name: customerName, lastOrderDate: new Date() },
+            $inc: { totalOrders: 1, totalSpent: totalAmount }
+          },
+          { upsert: true, new: true }
+        );
+      } catch (err) {
+        console.error("Failed to update customer:", err);
+      }
+    }
+
     res.status(201).json(savedOrder);
   } catch (error) {
     res.status(500).json({ message: 'Error creating order', error });
