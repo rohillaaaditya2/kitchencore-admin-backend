@@ -51,27 +51,11 @@ exports.createOrder = async (req, res) => {
       orderId: savedOrder.orderId
     });
 
-    // If order is pre-paid (e.g. from external platforms), trigger payment notification
-    if (paymentStatus === 'Paid') {
-      await sendNotification(restaurantId, {
-        type: 'PAYMENT_COMPLETED',
-        title: 'Payment Completed',
-        message: `Payment received for Order #${orderId}`,
-        orderId: savedOrder.orderId
-      });
-    }
-
-    // CUSTOMER UPDATE/UPSERT
+    // Customer update/upsert (silent)
     if (customerPhone) {
       try {
         const existingCustomer = await Customer.findOne({ phone: customerPhone, restaurantId });
         if (!existingCustomer) {
-          // New Customer Notification
-          await sendNotification(restaurantId, {
-            type: 'NEW_CUSTOMER',
-            title: 'New Customer Added',
-            message: `${customerName || 'A new customer'} has been added to your database.`
-          });
         }
         await Customer.findOneAndUpdate(
           { phone: customerPhone, restaurantId },
@@ -200,5 +184,29 @@ exports.updatePaymentStatus = async (req, res) => {
     res.status(200).json(updatedOrder);
   } catch (error) {
     res.status(500).json({ message: 'Error updating payment status', error });
+  }
+};
+
+// Get single order (public view)
+exports.getPublicOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { restaurantId } = req.query;
+    console.log(`Public Bill Request: ID=${id}, RestID=${restaurantId}`);
+    
+    if (!restaurantId) return res.status(400).json({ message: 'Restaurant ID is required' });
+
+    const order = await Order.findById(id).lean();
+    
+    // Safety check: ensure order exists AND belongs to this restaurant
+    if (!order || order.restaurantId.toString() !== restaurantId) {
+      console.log(`Order validation failed for ID=${id}. Order exists: ${!!order}, Match: ${order?.restaurantId?.toString() === restaurantId}`);
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    res.status(200).json(order);
+  } catch (error) {
+    console.error("Error in getPublicOrder:", error);
+    res.status(500).json({ message: 'Error fetching order', error: error.message });
   }
 };

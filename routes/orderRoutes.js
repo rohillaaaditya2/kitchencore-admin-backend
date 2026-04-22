@@ -7,6 +7,7 @@ const billingMiddleware = require('../middleware/billing');
 // Public: Create order and get history
 router.post('/', orderController.createOrder);
 router.get('/history/:phone', orderController.getOrdersByPhone);
+router.get('/public/:id', orderController.getPublicOrder);
 
 // Protected: Admin actions (Kitchen Terminal)
 router.get('/', authMiddleware, billingMiddleware, orderController.getAllOrders);
