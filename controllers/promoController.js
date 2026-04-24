@@ -11,11 +11,13 @@ exports.getAllPromos = async (req, res) => {
 
 exports.createPromo = async (req, res) => {
   try {
-    const { code, discountAmount, minOrderValue } = req.body;
+    const { code, discountType, discountValue, minOrderValue, expiryDate } = req.body;
     const newPromo = new PromoCode({
       code,
-      discountAmount,
+      discountType,
+      discountValue,
       minOrderValue,
+      expiryDate,
       restaurantId: req.restaurantId
     });
     await newPromo.save();
@@ -48,6 +50,11 @@ exports.validatePromo = async (req, res) => {
     
     if (!promo) {
       return res.status(404).json({ message: 'Invalid promo code' });
+    }
+
+    // Check Expiry
+    if (promo.expiryDate && new Date() > new Date(promo.expiryDate)) {
+      return res.status(400).json({ message: 'Promo code has expired' });
     }
     
     if (subtotal < promo.minOrderValue) {

@@ -11,7 +11,15 @@ const settingsSchema = new mongoose.Schema({
   packagingCharge: { type: Number, default: 20 },
   upiId: { type: String, default: '' },
   googleReviewLink: { type: String, default: '' },
-  restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true }
+  tables: { 
+    type: [{ 
+      id: String, 
+      seats: Number, 
+      status: { type: String, default: 'available' } 
+    }], 
+    default: [] 
+  },
+  restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true, index: true }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Settings', settingsSchema);

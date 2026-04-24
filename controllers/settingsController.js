@@ -79,7 +79,7 @@ exports.updateSettings = async (req, res) => {
     const allowedFields = [
       'packagingCharge', 'restaurantName', 'address', 'gstin', 
       'fssai', 'gstEnabled', 'upiId', 'logoUrl', 
-      'businessType', 'googleReviewLink'
+      'businessType', 'googleReviewLink', 'tables'
     ];
     
     let settings = await Settings.findOne({ restaurantId });

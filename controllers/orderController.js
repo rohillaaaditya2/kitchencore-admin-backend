@@ -1,6 +1,8 @@
 const Order = require('../models/Order');
 const Restaurant = require('../models/Restaurant');
 const Customer = require('../models/Customer');
+const Product = require('../models/Product');
+const Ingredient = require('../models/Ingredient');
 const { sendNotification } = require('../socket');
 
 // Create a new order
@@ -51,6 +53,28 @@ exports.createOrder = async (req, res) => {
       orderId: savedOrder.orderId
     });
 
+    // Auto Inventory Deduction
+    try {
+      for (const item of items) {
+        const productId = item.id || item._id;
+        if (productId) {
+          const product = await Product.findById(productId);
+          if (product && product.recipe && product.recipe.length > 0) {
+            for (const rec of product.recipe) {
+              if (rec.ingredient) {
+                const deduction = (rec.quantity || 0) * (item.quantity || 1);
+                await Ingredient.findByIdAndUpdate(rec.ingredient, {
+                  $inc: { quantity: -deduction }
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Auto inventory deduction failed:", err);
+    }
+
     // Customer update/upsert (silent)
     if (customerPhone) {
       try {
@@ -79,7 +103,24 @@ exports.createOrder = async (req, res) => {
 // Get all orders (for admin)
 exports.getAllOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ restaurantId: req.restaurantId }).sort({ createdAt: -1 });
+    const { status, days } = req.query;
+    let query = { restaurantId: req.restaurantId };
+
+    if (status) {
+      if (status === 'Active') {
+        query.status = { $in: ['Pending', 'Preparing'] };
+      } else {
+        query.status = status;
+      }
+    }
+
+    if (days) {
+      const dateLimit = new Date();
+      dateLimit.setDate(dateLimit.getDate() - parseInt(days));
+      query.createdAt = { $gte: dateLimit };
+    }
+
+    const orders = await Order.find(query).sort({ createdAt: -1 });
     res.status(200).json(orders);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching orders', error });

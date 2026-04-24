@@ -44,6 +44,13 @@ exports.createProduct = async (req, res) => {
     
     if (productData.category) productData.category = productData.category.trim();
     if (productData.price) productData.price = Number(productData.price);
+    if (productData.recipe && typeof productData.recipe === 'string') {
+      try {
+        productData.recipe = JSON.parse(productData.recipe);
+      } catch (e) {
+        console.error("Failed to parse recipe:", e);
+      }
+    }
 
     const newProduct = new Product(productData);
     const savedProduct = await newProduct.save();
@@ -76,6 +83,13 @@ exports.updateProduct = async (req, res) => {
     }
     
     if (updateData.price) updateData.price = Number(updateData.price);
+    if (updateData.recipe && typeof updateData.recipe === 'string') {
+      try {
+        updateData.recipe = JSON.parse(updateData.recipe);
+      } catch (e) {
+        console.error("Failed to parse recipe:", e);
+      }
+    }
     
     const updatedProduct = await Product.findOneAndUpdate(
       { _id: id, restaurantId: req.restaurantId }, 

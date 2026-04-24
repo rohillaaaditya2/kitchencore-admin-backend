@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const notificationSchema = new mongoose.Schema({
-  restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true },
+  restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true, index: true },
   type: { 
     type: String, 
     enum: ['NEW_ORDER', 'PAYMENT_COMPLETED', 'ORDER_STATUS_UPDATED', 'NEW_CUSTOMER'],

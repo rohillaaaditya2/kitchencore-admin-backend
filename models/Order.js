@@ -23,7 +23,7 @@ const orderSchema = new mongoose.Schema({
   promoDiscount: { type: Number, default: 0 },
   loyaltyDiscount: { type: Number, default: 0 },
   source: { type: String, enum: ['Direct', 'Zomato', 'Swiggy', 'POS'], default: 'Direct' },
-  restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true }
+  restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true, index: true }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', orderSchema);

@@ -16,6 +16,7 @@ const billingRoutes = require('./routes/billingRoutes');
 const superAdminRoutes = require('./routes/superAdminRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const inventoryRoutes = require('./routes/inventoryRoutes');
 const billingMiddleware = require('./middleware/billing');
 
 const path = require('path');
@@ -26,6 +27,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.get('/api/inventory-test-v2', (req, res) => res.json({ status: 'ok', version: '2.0.1' }));
+app.get('/api/inventory-status', (req, res) => res.json({ status: 'ok', msg: 'Route is at the top' }));
 app.use('/api/products', productRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', settingsRoutes);
@@ -37,23 +41,11 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/super-admin', superAdminRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/notifications', notificationRoutes);
-
-// --- SUPER ADMIN DEMO ROUTES (MERGED) ---
+// --- SUPER ADMIN ROUTES ---
+const adminAuth = require('./middleware/adminAuth');
 const DemoRequest = require('./models/DemoRequest');
+const Restaurant = require('./models/Restaurant');
 const jwt = require('jsonwebtoken');
-
-const adminAuth = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'No token' });
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    if (decoded.role !== 'SuperAdmin') throw new Error();
-    req.user = decoded;
-    next();
-  } catch (err) {
-    res.status(401).json({ message: 'Unauthorized' });
-  }
-};
 
 app.post('/api/demo-request', async (req, res) => {
   try {
@@ -78,14 +70,12 @@ app.patch('/api/demo-requests/:id', adminAuth, async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// To ensure super admin frontend compatibility using /login
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const masterEmail = process.env.SUPER_ADMIN_EMAIL || 'aadityarohilla668@gmail.com';
     const masterPass = process.env.SUPER_ADMIN_PASSWORD || 'admin123';
 
-    // A. Check Master Credentials (Env Based)
     if (email === masterEmail && password === masterPass) {
       const token = jwt.sign(
         { role: 'SuperAdmin', id: 'master_admin' }, 
@@ -95,7 +85,6 @@ app.post('/api/login', async (req, res) => {
       return res.status(200).json({ token, role: 'SuperAdmin' });
     }
 
-    // B. Check Database for SuperAdmin user
     const dbAdmin = await Restaurant.findOne({ email: email.toLowerCase().trim(), role: 'SuperAdmin' });
     if (dbAdmin) {
       const bcrypt = require('bcryptjs');
@@ -109,14 +98,12 @@ app.post('/api/login', async (req, res) => {
         return res.status(200).json({ token, role: 'SuperAdmin' });
       }
     }
-    
     res.status(401).json({ message: 'Invalid Super Admin credentials' });
   } catch (error) {
     res.status(500).json({ message: 'Login failed', error: error.message });
   }
 });
 
-const Restaurant = require('./models/Restaurant');
 app.get('/api/restaurants', adminAuth, async (req, res) => {
   try {
     const merchants = await Restaurant.find({ isVerified: true, role: 'Merchant' }, '-password').sort({ createdAt: -1 });
@@ -134,31 +121,28 @@ app.patch('/api/restaurant-status', adminAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Update failed', error: err.message }); }
 });
 
-
-
 // Connect to MongoDB Atlas
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/pizzatown')
   .then(() => {
     console.log('Connected to MongoDB');
-    // Start the auto-status sweep task only if not on Vercel
     if (!process.env.VERCEL) {
       startAutoStatusSweep();
     }
   })
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Auto-fulfillment sweep logic
 const Order = require('./models/Order');
 function startAutoStatusSweep() {
   setInterval(async () => {
     try {
       const now = Date.now();
-      const ordersToUpdate = await Order.find({ status: 'Preparing' });
-      
+      const ordersToUpdate = await Order.find({ 
+        status: 'Preparing',
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+      });
       for (let order of ordersToUpdate) {
         const prepStart = order.prepTimeUpdatedAt ? new Date(order.prepTimeUpdatedAt).getTime() : new Date(order.createdAt).getTime();
         const durationMs = (order.estimatedPrepTime || 15) * 60 * 1000;
-        
         if (now >= (prepStart + durationMs)) {
           order.status = 'Served';
           await order.save();
@@ -168,17 +152,15 @@ function startAutoStatusSweep() {
     } catch (err) {
       console.error('Error in auto-status sweep:', err);
     }
-  }, 30000); // Check every 30 seconds
+  }, 30000);
 }
 
 const PORT = process.env.PORT || 5000;
 const http = require('http');
 const server = http.createServer(app);
 const socketIO = require('./socket');
-
-// Initialize Socket.io
 socketIO.init(server);
-
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT} (accessible on local network)`);
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Inventory Route Active: ${new Date().toISOString()}`);
 });

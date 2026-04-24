@@ -7,7 +7,7 @@ const reviewSchema = new mongoose.Schema({
   foodQuality: { type: Number, min: 1, max: 5 },
   service: { type: Number, min: 1, max: 5 },
   feedback: { type: String },
-  restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true }
+  restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true, index: true }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Review', reviewSchema);
