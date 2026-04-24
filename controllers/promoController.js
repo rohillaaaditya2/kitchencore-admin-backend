@@ -40,28 +40,38 @@ exports.deletePromo = async (req, res) => {
 exports.validatePromo = async (req, res) => {
   try {
     const { code, subtotal, restaurantId } = req.body;
-    if (!restaurantId) return res.status(400).json({ message: 'Restaurant ID is required' });
+    console.log(`Validating promo: ${code} for restaurant: ${restaurantId}`);
+    
+    if (!restaurantId) {
+      console.log('Validation failed: Missing restaurantId');
+      return res.status(400).json({ message: 'Restaurant ID is required' });
+    }
 
     const promo = await PromoCode.findOne({ 
       code: code.toUpperCase(), 
-      restaurantId,
+      restaurantId: restaurantId,
       isActive: true 
     });
     
     if (!promo) {
+      console.log(`Validation failed: Promo ${code} not found for ${restaurantId}`);
       return res.status(404).json({ message: 'Invalid promo code' });
     }
 
     // Check Expiry
     if (promo.expiryDate && new Date() > new Date(promo.expiryDate)) {
+      console.log(`Validation failed: Promo ${code} expired on ${promo.expiryDate}`);
       return res.status(400).json({ message: 'Promo code has expired' });
     }
     
     if (subtotal < promo.minOrderValue) {
+      console.log(`Validation failed: Subtotal ${subtotal} < Min ${promo.minOrderValue}`);
       return res.status(400).json({ 
         message: `Min order value for this code is ₹${promo.minOrderValue}` 
       });
     }
+    
+    console.log(`Validation success: ${code}`);
     
     res.json(promo);
   } catch (err) {
