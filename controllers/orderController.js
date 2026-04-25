@@ -75,22 +75,53 @@ exports.createOrder = async (req, res) => {
       console.error("Auto inventory deduction failed:", err);
     }
 
-    // Customer update/upsert (silent)
+    // Customer update/upsert (Enhanced CRM)
     if (customerPhone) {
       try {
+        const itemUpdateData = items.map(item => ({
+          productId: item.id || item._id,
+          name: item.name,
+          count: item.quantity || 1
+        }));
+
         const existingCustomer = await Customer.findOne({ phone: customerPhone, restaurantId });
+        
         if (!existingCustomer) {
+          // New Customer
+          await Customer.create({
+            phone: customerPhone,
+            name: customerName,
+            restaurantId,
+            totalOrders: 1,
+            totalSpent: totalAmount,
+            lastOrderDate: new Date(),
+            visitHistory: [new Date()],
+            favoriteItems: itemUpdateData,
+            segment: 'New'
+          });
+        } else {
+          // Update Existing Customer
+          let updatedFavorites = [...existingCustomer.favoriteItems];
+          itemUpdateData.forEach(newItem => {
+            const index = updatedFavorites.findIndex(fav => fav.productId?.toString() === newItem.productId?.toString() || fav.name === newItem.name);
+            if (index > -1) {
+              updatedFavorites[index].count += newItem.count;
+            } else {
+              updatedFavorites.push(newItem);
+            }
+          });
+
+          existingCustomer.name = customerName || existingCustomer.name;
+          existingCustomer.lastOrderDate = new Date();
+          existingCustomer.favoriteItems = updatedFavorites;
+          existingCustomer.totalOrders += 1;
+          existingCustomer.totalSpent += totalAmount;
+          existingCustomer.visitHistory.push(new Date());
+          
+          await existingCustomer.save();
         }
-        await Customer.findOneAndUpdate(
-          { phone: customerPhone, restaurantId },
-          { 
-            $set: { name: customerName, lastOrderDate: new Date() },
-            $inc: { totalOrders: 1, totalSpent: totalAmount }
-          },
-          { upsert: true, new: true }
-        );
       } catch (err) {
-        console.error("Failed to update customer:", err);
+        console.error("Failed to update customer CRM:", err);
       }
     }
 
