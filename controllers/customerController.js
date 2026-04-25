@@ -1,5 +1,6 @@
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
+const mongoose = require('mongoose');
 
 exports.getAllCustomers = async (req, res) => {
   try {
@@ -68,7 +69,7 @@ exports.getCRMStats = async (req, res) => {
     const totalCustomers = await Customer.countDocuments({ restaurantId });
     
     const segmentStats = await Customer.aggregate([
-      { $match: { restaurantId: new require('mongoose').Types.ObjectId(restaurantId) } },
+      { $match: { restaurantId: new mongoose.Types.ObjectId(restaurantId) } },
       { $group: { _id: '$segment', count: { $sum: 1 } } }
     ]);
 
