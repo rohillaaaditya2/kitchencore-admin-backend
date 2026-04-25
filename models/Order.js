@@ -3,13 +3,20 @@ const mongoose = require('mongoose');
 const orderSchema = new mongoose.Schema({
   orderId: { type: String, required: true, unique: true },
   items: [{
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     name: String,
     price: Number,
-    quantity: Number
+    quantity: Number,
+    instructions: { type: String, default: '' },
+    category: { type: String }
   }],
   totalAmount: { type: Number, required: true },
   tableNumber: { type: String, required: true, default: 'Takeaway' },
-  status: { type: String, enum: ['Pending', 'Preparing', 'Served'], default: 'Pending' },
+  status: { 
+    type: String, 
+    enum: ['Pending', 'Preparing', 'Ready', 'Served', 'Cancelled'], 
+    default: 'Pending' 
+  },
   isAccepted: { type: Boolean, default: false },
   paymentStatus: { type: String, enum: ['Pending', 'Paid'], default: 'Pending' },
   paymentMethod: { type: String, enum: ['Cash', 'QR', 'Online', 'Other', 'PAY_LATER'], default: 'Cash' },
@@ -23,6 +30,7 @@ const orderSchema = new mongoose.Schema({
   promoDiscount: { type: Number, default: 0 },
   loyaltyDiscount: { type: Number, default: 0 },
   source: { type: String, enum: ['Direct', 'Zomato', 'Swiggy', 'POS'], default: 'Direct' },
+  kotPrinted: { type: Boolean, default: false },
   restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true, index: true }
 }, { timestamps: true });
 
