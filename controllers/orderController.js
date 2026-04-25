@@ -189,7 +189,12 @@ exports.updateOrderStatus = async (req, res) => {
     const { status, paymentStatus, paymentMethod, finalAmount, promoCodeUsed, promoDiscount } = req.body;
     
     const updateFields = {};
-    if (status) updateFields.status = status;
+    if (status) {
+      updateFields.status = status;
+      if (status === 'Preparing') updateFields.preparingAt = new Date();
+      if (status === 'Ready') updateFields.readyAt = new Date();
+      if (status === 'Served') updateFields.servedAt = new Date();
+    }
     if (paymentStatus) updateFields.paymentStatus = paymentStatus;
     if (paymentMethod) updateFields.paymentMethod = paymentMethod;
     if (finalAmount !== undefined) updateFields.totalAmount = finalAmount; // Update total if discounted

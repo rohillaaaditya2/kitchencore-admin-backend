@@ -79,7 +79,29 @@ exports.getReportsData = async (req, res) => {
     const totalCustomers = await Customer.countDocuments({ restaurantId });
     const returningCustomers = await Customer.countDocuments({ restaurantId, totalOrders: { $gt: 1 } });
     
-    // 6. Profit (Sales - Purchases - Expenses)
+    // 6. Kitchen Performance
+    const servedOrders = orders.filter(o => o.status === 'Served' && o.createdAt && o.servedAt);
+    let avgFulfillmentTime = 0;
+    let avgPrepTime = 0;
+    let lateOrders = 0;
+
+    if (servedOrders.length > 0) {
+      const totalFulfillment = servedOrders.reduce((sum, o) => sum + (new Date(o.servedAt) - new Date(o.createdAt)), 0);
+      avgFulfillmentTime = Math.floor(totalFulfillment / servedOrders.length / 60000); // mins
+
+      const prepOrders = servedOrders.filter(o => o.preparingAt && o.readyAt);
+      if (prepOrders.length > 0) {
+        const totalPrep = prepOrders.reduce((sum, o) => sum + (new Date(o.readyAt) - new Date(o.preparingAt)), 0);
+        avgPrepTime = Math.floor(totalPrep / prepOrders.length / 60000); // mins
+      }
+
+      lateOrders = servedOrders.filter(o => {
+        const duration = (new Date(o.servedAt) - new Date(o.createdAt)) / 60000;
+        return duration > (o.estimatedPrepTime || 15);
+      }).length;
+    }
+
+    // 7. Profit (Sales - Purchases - Expenses)
     const profit = totalSales - totalPurchaseCost - totalExpenses;
 
     res.json({
@@ -107,6 +129,12 @@ exports.getReportsData = async (req, res) => {
         revenue: totalSales || 0, 
         cost: totalPurchaseCost || 0, 
         net: profit || 0 
+      },
+      performance: {
+        avgFulfillmentTime: avgFulfillmentTime || 0,
+        avgPrepTime: avgPrepTime || 0,
+        lateOrdersCount: lateOrders || 0,
+        efficiencyScore: servedOrders.length ? Math.round(((servedOrders.length - lateOrders) / servedOrders.length) * 100) : 100
       }
     });
   } catch (err) {

@@ -31,6 +31,13 @@ const orderSchema = new mongoose.Schema({
   loyaltyDiscount: { type: Number, default: 0 },
   source: { type: String, enum: ['Direct', 'Zomato', 'Swiggy', 'POS'], default: 'Direct' },
   kotPrinted: { type: Boolean, default: false },
+  
+  // Performance Analytics
+  acceptedAt: { type: Date },
+  preparingAt: { type: Date },
+  readyAt: { type: Date },
+  servedAt: { type: Date },
+  
   restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true, index: true }
 }, { timestamps: true });
 
