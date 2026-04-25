@@ -3,6 +3,7 @@ const Restaurant = require('../models/Restaurant');
 const Customer = require('../models/Customer');
 const Product = require('../models/Product');
 const Ingredient = require('../models/Ingredient');
+const InventoryLog = require('../models/InventoryLog');
 const { sendNotification } = require('../socket');
 
 // Create a new order
@@ -53,7 +54,7 @@ exports.createOrder = async (req, res) => {
       orderId: savedOrder.orderId
     });
 
-    // Auto Inventory Deduction
+    // Auto Inventory Deduction with Logging
     try {
       for (const item of items) {
         const productId = item.id || item._id;
@@ -62,9 +63,24 @@ exports.createOrder = async (req, res) => {
           if (product && product.recipe && product.recipe.length > 0) {
             for (const rec of product.recipe) {
               if (rec.ingredient) {
-                const deduction = (rec.quantity || 0) * (item.quantity || 1);
+                const totalDeduction = (rec.quantity || 0) * (item.quantity || 1);
+                
+                // 1. Deduct from Ingredient
                 await Ingredient.findByIdAndUpdate(rec.ingredient, {
-                  $inc: { quantity: -deduction }
+                  $inc: { quantity: -totalDeduction }
+                });
+
+                // 2. Create Inventory Log
+                await InventoryLog.create({
+                  restaurantId,
+                  ingredientId: rec.ingredient,
+                  type: 'OUT',
+                  quantity: totalDeduction,
+                  unit: rec.unit || 'g',
+                  date: new Date(),
+                  referenceId: savedOrder._id,
+                  referenceModel: 'Order',
+                  note: `Order #${orderId} - ${item.name}`
                 });
               }
             }
@@ -166,6 +182,37 @@ exports.updateOrderStatus = async (req, res) => {
     
     const updatedOrder = await Order.findOneAndUpdate({ _id: id, restaurantId: req.restaurantId }, { status }, { new: true });
     if (!updatedOrder) return res.status(404).json({ message: 'Order not found' });
+
+    // Handle Inventory Restoration on Cancellation
+    if (status === 'Cancelled') {
+      try {
+        for (const item of updatedOrder.items) {
+          const product = await Product.findById(item.productId || item.id || item._id);
+          if (product && product.recipe) {
+            for (const rec of product.recipe) {
+              if (rec.ingredient) {
+                const restoreQty = (rec.quantity || 0) * (item.quantity || 1);
+                await Ingredient.findByIdAndUpdate(rec.ingredient, { $inc: { quantity: restoreQty } });
+                
+                await InventoryLog.create({
+                  restaurantId: req.restaurantId,
+                  ingredientId: rec.ingredient,
+                  type: 'IN',
+                  quantity: restoreQty,
+                  unit: rec.unit || 'g',
+                  date: new Date(),
+                  referenceId: updatedOrder._id,
+                  referenceModel: 'Order',
+                  note: `Restored - Cancelled Order #${updatedOrder.orderId}`
+                });
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Inventory restoration failed:", err);
+      }
+    }
 
     // Trigger Notification
     await sendNotification(req.restaurantId, {

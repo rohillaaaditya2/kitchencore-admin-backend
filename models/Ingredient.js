@@ -6,6 +6,7 @@ const ingredientSchema = new mongoose.Schema({
   quantity: { type: Number, default: 0 },
   unit: { type: String, required: true }, // g, kg, ml, l, pcs, slice
   costPerUnit: { type: Number, default: 0 },
+  avgCost: { type: Number, default: 0 },
   lowStockThreshold: { type: Number, default: 10 },
   restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true, index: true }
 }, { timestamps: true });
