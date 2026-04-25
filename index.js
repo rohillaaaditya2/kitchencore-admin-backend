@@ -19,6 +19,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const expenseRoutes = require('./routes/expenseRoutes');
 const billingMiddleware = require('./middleware/billing');
 
 const path = require('path');
@@ -45,6 +46,7 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/expenses', expenseRoutes);
 // --- SUPER ADMIN ROUTES ---
 const adminAuth = require('./middleware/adminAuth');
 const DemoRequest = require('./models/DemoRequest');

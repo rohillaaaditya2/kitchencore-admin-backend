@@ -1,4 +1,5 @@
 const Product = require('../models/Product');
+const Ingredient = require('../models/Ingredient');
 const mongoose = require('mongoose');
 
 // Get all products
@@ -25,8 +26,47 @@ exports.getAllProducts = async (req, res) => {
     const filter = { restaurantId };
     if (!isAdminView) filter.isAvailable = true; // Only show available on public menu
 
-    const products = await Product.find(filter);
-    res.json(products);
+    const products = await Product.find(filter).lean();
+
+    // Inventory Check Logic
+    const ingredientIds = [...new Set(products.flatMap(p => (p.recipe || []).map(r => r.ingredient)).filter(id => id))];
+    const ingredients = await Ingredient.find({ _id: { $in: ingredientIds } }).lean();
+    const stockMap = ingredients.reduce((acc, ing) => {
+      acc[ing._id.toString()] = ing.quantity;
+      return acc;
+    }, {});
+
+    const enrichedProducts = products.map(product => {
+      let hasLowStock = false;
+      const stockDetails = (product.recipe || []).map(r => {
+        const available = stockMap[r.ingredient?.toString()] || 0;
+        if (available < r.quantity) hasLowStock = true;
+        return {
+          ingredient: r.ingredient,
+          required: r.quantity,
+          available
+        };
+      });
+
+      return {
+        ...product,
+        hasLowStock,
+        // If it's the public view and any ingredient is missing, mark as unavailable
+        isAvailable: isAdminView ? product.isAvailable : (product.isAvailable && !hasLowStock)
+      };
+    });
+
+    // Final products for response
+    const finalProducts = isAdminView 
+      ? enrichedProducts 
+      : enrichedProducts.map(p => ({
+          ...p,
+          // If manually disabled by admin, it's false. If enabled but low stock, it stays true but we flag it.
+          // Wait, if we want to show "Out of Stock" button, we need isAvailable to be true but hasLowStock to be true.
+          isAvailable: p.isAvailable 
+        }));
+
+    res.json(finalProducts);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching products', error });
   }

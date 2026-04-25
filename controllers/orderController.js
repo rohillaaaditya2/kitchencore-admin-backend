@@ -110,6 +110,7 @@ exports.createOrder = async (req, res) => {
             restaurantId,
             totalOrders: 1,
             totalSpent: totalAmount,
+            loyaltyPoints: paymentStatus === 'Paid' ? Math.floor(totalAmount / 10) : 0,
             lastOrderDate: new Date(),
             visitHistory: [new Date()],
             favoriteItems: itemUpdateData,
@@ -132,6 +133,13 @@ exports.createOrder = async (req, res) => {
           existingCustomer.favoriteItems = updatedFavorites;
           existingCustomer.totalOrders += 1;
           existingCustomer.totalSpent += totalAmount;
+          if (paymentStatus === 'Paid') {
+            existingCustomer.loyaltyPoints += Math.floor(totalAmount / 10);
+          }
+          if (loyaltyDiscount > 0) {
+            existingCustomer.loyaltyPoints -= loyaltyDiscount;
+            if (existingCustomer.loyaltyPoints < 0) existingCustomer.loyaltyPoints = 0;
+          }
           existingCustomer.visitHistory.push(new Date());
           
           await existingCustomer.save();
@@ -178,9 +186,21 @@ exports.getAllOrders = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, paymentStatus, paymentMethod, finalAmount, promoCodeUsed, promoDiscount } = req.body;
     
-    const updatedOrder = await Order.findOneAndUpdate({ _id: id, restaurantId: req.restaurantId }, { status }, { new: true });
+    const updateFields = {};
+    if (status) updateFields.status = status;
+    if (paymentStatus) updateFields.paymentStatus = paymentStatus;
+    if (paymentMethod) updateFields.paymentMethod = paymentMethod;
+    if (finalAmount !== undefined) updateFields.totalAmount = finalAmount; // Update total if discounted
+    if (promoCodeUsed) updateFields.promoCodeUsed = promoCodeUsed;
+    if (promoDiscount !== undefined) updateFields.promoDiscount = promoDiscount;
+
+    const updatedOrder = await Order.findOneAndUpdate(
+      { _id: id, restaurantId: req.restaurantId }, 
+      { $set: updateFields }, 
+      { new: true }
+    );
     if (!updatedOrder) return res.status(404).json({ message: 'Order not found' });
 
     // Handle Inventory Restoration on Cancellation
@@ -221,6 +241,19 @@ exports.updateOrderStatus = async (req, res) => {
       message: `Order #${updatedOrder.orderId} status changed to ${status}`,
       orderId: updatedOrder.orderId
     });
+
+    // Loyalty Points on Settlement
+    if (paymentStatus === 'Paid' && updatedOrder.customerPhone) {
+      try {
+        const pts = Math.floor(updatedOrder.totalAmount / 10);
+        await Customer.findOneAndUpdate(
+          { phone: updatedOrder.customerPhone, restaurantId: req.restaurantId },
+          { $inc: { loyaltyPoints: pts } }
+        );
+      } catch (err) {
+        console.error("Failed to award points on settlement:", err);
+      }
+    }
 
     res.status(200).json(updatedOrder);
   } catch (error) {

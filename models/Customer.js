@@ -18,7 +18,8 @@ const customerSchema = new mongoose.Schema({
     type: String, 
     enum: ['New', 'Repeat', 'Loyal', 'Inactive'],
     default: 'New'
-  }
+  },
+  loyaltyPoints: { type: Number, default: 0 }
 }, { timestamps: true });
 
 // Compound unique index for phone and restaurantId

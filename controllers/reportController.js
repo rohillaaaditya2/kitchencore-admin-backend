@@ -53,7 +53,9 @@ exports.getReportsData = async (req, res) => {
 
     const totalSales = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     const totalOrders = orders.length;
-    const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
+    const pendingPayments = orders.filter(o => o.paymentStatus === 'Pending').reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const paidSales = totalSales - pendingPayments;
+
     const paymentSplit = orders.reduce((acc, o) => {
       const method = o.paymentMethod || 'Cash';
       acc[method] = (acc[method] || 0) + (o.totalAmount || 0);
@@ -68,19 +70,25 @@ exports.getReportsData = async (req, res) => {
     const ingredients = await Ingredient.find({ restaurantId });
     const lowStockItems = ingredients.filter(i => i.quantity < (i.lowStockThreshold || 10));
 
-    // 4. Customer Stats
+    // 4. Expense Data
+    const Expense = mongoose.model('Expense');
+    const expenses = await Expense.find({ restaurantId, date: dateQuery });
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+    // 5. Customer Stats
     const totalCustomers = await Customer.countDocuments({ restaurantId });
     const returningCustomers = await Customer.countDocuments({ restaurantId, totalOrders: { $gt: 1 } });
     
-    // 5. Profit (Rough estimate: Sales - Purchase Cost in period)
-    const profit = totalSales - totalPurchaseCost;
+    // 6. Profit (Sales - Purchases - Expenses)
+    const profit = totalSales - totalPurchaseCost - totalExpenses;
 
     res.json({
       debugId: restaurantId,
       sales: { 
         totalSales: totalSales || 0, 
         totalOrders: totalOrders || 0, 
-        avgOrderValue: avgOrderValue || 0, 
+        pendingPayments: pendingPayments || 0,
+        paidSales: paidSales || 0,
         paymentSplit: paymentSplit || {} 
       },
       purchases: { 
@@ -150,12 +158,13 @@ exports.exportPDF = async (req, res) => {
 
       const table = {
         title: "Order Details",
-        headers: ["Order ID", "Customer", "Amount", "Method", "Date"],
+        headers: ["Order ID", "Customer", "Amount", "Method", "Status", "Date"],
         rows: orders.map(o => [
           o.orderId,
           o.customerName || 'Walk-in',
           `Rs. ${o.totalAmount}`,
-          o.paymentMethod || 'Cash',
+          o.paymentMethod === 'PAY_LATER' ? 'Credit' : (o.paymentMethod || 'Cash'),
+          o.paymentStatus || 'Paid',
           new Date(o.createdAt).toLocaleDateString()
         ])
       };
