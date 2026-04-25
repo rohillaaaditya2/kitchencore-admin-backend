@@ -40,15 +40,16 @@ exports.getReportsData = async (req, res) => {
     
     const queryId = new mongoose.Types.ObjectId(restaurantId);
 
-    // 1. Sales Data - Try both string and ObjectId for compatibility
+    // 1. Sales Data - Using multi-type query for ID and precise date filter
     const orders = await Order.find({ 
       $or: [
         { restaurantId: restaurantId }, 
         { restaurantId: queryId }
-      ]
+      ],
+      createdAt: dateQuery
     });
     
-    console.log(`DEBUG: Found ${orders.length} orders total for RID ${restaurantId}`);
+    console.log(`Reports: Found ${orders.length} orders for RID ${restaurantId} in range ${range}`);
 
     const totalSales = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     const totalOrders = orders.length;
