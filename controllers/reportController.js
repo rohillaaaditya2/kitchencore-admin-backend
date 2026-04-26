@@ -321,21 +321,143 @@ exports.exportPDF = async (req, res) => {
     doc.fontSize(10).fillColor('#64748b').text(`Period: ${range} (${new Date(dateQuery.$gte).toLocaleDateString()} - ${new Date(dateQuery.$lte).toLocaleDateString()})`);
     doc.moveDown();
 
-    if (type === 'inventory') {
+    else if (type === 'inventory') {
       const ingredients = await Ingredient.find({ restaurantId });
-      const table = {
-        title: "Current Inventory Status",
-        headers: ["Name", "Category", "Stock", "Unit", "Avg Cost", "Value"],
-        rows: ingredients.map(i => [
-          i.name,
-          i.category,
-          i.quantity.toString(),
-          i.unit,
-          `Rs. ${i.avgCost.toFixed(2)}`,
-          `Rs. ${(i.quantity * i.avgCost).toFixed(2)}`
-        ])
-      };
-      await doc.table(table, { prepareHeader: () => doc.font("Helvetica-Bold").fontSize(10), prepareRow: () => doc.font("Helvetica").fontSize(10) });
+      
+      const totalItems = ingredients.length;
+      const totalValue = ingredients.reduce((sum, i) => sum + ((i.quantity || 0) * (i.avgCost || 0)), 0);
+      const lowStockItems = ingredients.filter(i => (i.quantity || 0) < (i.lowStockThreshold || 10));
+
+      const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <meta charset="UTF-8">
+          <style>
+              @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+              body { font-family: 'Inter', sans-serif; color: #1e293b; margin: 0; padding: 40px; background: white; }
+              .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; }
+              .logo-section h1 { color: #f97316; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+              .logo-section p { margin: 4px 0 0; color: #64748b; font-size: 14px; font-weight: 600; }
+              .report-info { text-align: right; }
+              .report-info h2 { margin: 0; color: #0f172a; font-size: 20px; font-weight: 800; letter-spacing: 0.05em; }
+              .report-info p { margin: 4px 0 0; color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+              
+              .summary-grid { display: flex; gap: 15px; margin-bottom: 30px; }
+              .summary-card { flex: 1; background: #f8fafc; padding: 20px; border-radius: 20px; border: 1px solid #e2e8f0; }
+              .summary-card h3 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.05em; }
+              .summary-card p { margin: 0; font-size: 22px; font-weight: 800; color: #0f172a; }
+              
+              .alert-section { background: #fff1f2; border: 1px solid #fecdd3; padding: 20px; border-radius: 20px; margin-bottom: 30px; }
+              .alert-header { display: flex; items-center: center; gap: 10px; margin-bottom: 10px; color: #e11d48; }
+              .alert-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+              .alert-list { display: flex; flex-wrap: wrap; gap: 8px; }
+              .alert-tag { background: #ffe4e6; color: #e11d48; padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 700; border: 1px solid #fda4af; }
+              
+              table { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 30px; }
+              th { text-align: left; background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 12px 15px; letter-spacing: 0.05em; }
+              th:first-child { border-top-left-radius: 12px; }
+              th:last-child { border-top-right-radius: 12px; }
+              td { padding: 12px 15px; border-bottom: 1px solid #f1f5f9; font-size: 12px; font-weight: 500; }
+              tr:nth-child(even) { background: #f8fafc; }
+              tr:last-child td:first-child { border-bottom-left-radius: 12px; }
+              tr:last-child td:last-child { border-bottom-right-radius: 12px; }
+              
+              .text-right { text-align: right; }
+              .font-bold { font-weight: 700; }
+              .footer { text-align: center; margin-top: 50px; border-top: 1px solid #f1f5f9; padding-top: 20px; color: #94a3b8; font-size: 10px; font-weight: 600; }
+          </style>
+      </head>
+      <body>
+          <div class="header">
+              <div class="logo-section">
+                  <h1>KitchenCore</h1>
+                  <p>${restaurant?.restaurantName || 'Restaurant Management'}</p>
+              </div>
+              <div class="report-info">
+                  <h2>INVENTORY REPORT</h2>
+                  <p>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+              </div>
+          </div>
+          
+          <div class="summary-grid">
+              <div class="summary-card">
+                  <h3>Total Items</h3>
+                  <p>${totalItems}</p>
+              </div>
+              <div class="summary-card">
+                  <h3>Stock Value</h3>
+                  <p>₹${totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+              </div>
+              <div class="summary-card" style="${lowStockItems.length > 0 ? 'background: #fff1f2; border-color: #fecdd3;' : ''}">
+                  <h3 style="${lowStockItems.length > 0 ? 'color: #e11d48;' : ''}">Low Stock</h3>
+                  <p style="${lowStockItems.length > 0 ? 'color: #e11d48;' : ''}">${lowStockItems.length}</p>
+              </div>
+          </div>
+
+          ${lowStockItems.length > 0 ? `
+          <div class="alert-section">
+              <div class="alert-header">
+                  <span class="alert-title">⚠️ Reorder Recommendations</span>
+              </div>
+              <div class="alert-list">
+                  ${lowStockItems.map(i => `<span class="alert-tag">${i.name} (${i.quantity} ${i.unit})</span>`).join('')}
+              </div>
+          </div>
+          ` : ''}
+          
+          <table>
+              <thead>
+                  <tr>
+                      <th>Item Name</th>
+                      <th>Category</th>
+                      <th class="text-right">Stock</th>
+                      <th>Unit</th>
+                      <th class="text-right">Avg Cost</th>
+                      <th class="text-right">Total Value</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  ${ingredients.map(i => {
+                    const itemValue = (i.quantity || 0) * (i.avgCost || 0);
+                    const isLow = (i.quantity || 0) < (i.lowStockThreshold || 10);
+                    return `
+                    <tr style="${isLow ? 'color: #e11d48;' : ''}">
+                        <td class="font-bold">${i.name}</td>
+                        <td style="color: #64748b;">${i.category || 'General'}</td>
+                        <td class="text-right font-bold">${i.quantity}</td>
+                        <td style="color: #64748b;">${i.unit}</td>
+                        <td class="text-right">₹${(i.avgCost || 0).toLocaleString()}</td>
+                        <td class="text-right font-bold" style="color: #0f172a;">₹${itemValue.toLocaleString()}</td>
+                    </tr>
+                    `;
+                  }).join('')}
+              </tbody>
+          </table>
+          
+          <div class="footer">
+              This inventory valuation report was generated via KitchenCore on ${new Date().toLocaleString()}
+          </div>
+      </body>
+      </html>
+      `;
+
+      const browser = await puppeteer.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+      const page = await browser.newPage();
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '0px', right: '0px', bottom: '0px', left: '0px' }
+      });
+
+      await browser.close();
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=KitchenCore_Inventory_Report.pdf`);
+      return res.send(pdfBuffer);
     }
 
     else if (type === 'purchases') {
