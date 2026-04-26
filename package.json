@@ -22,6 +22,7 @@
     "nodemailer": "^6.9.13",
     "pdfkit": "^0.18.0",
     "pdfkit-table": "^0.1.99",
+    "puppeteer": "^24.42.0",
     "razorpay": "^2.9.6",
     "socket.io": "^4.8.3"
   }
