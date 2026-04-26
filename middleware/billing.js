@@ -15,26 +15,26 @@ const billingMiddleware = async (req, res, next) => {
     
     // If no trial date is set at all (legacy account created before billing system),
     // auto-grant a 30-day grace period and save it so they aren't immediately blocked.
-    if (!restaurant.trialEndsAt && !restaurant.subscriptionEndsAt) {
+    if (!restaurant.trialEndDate && !restaurant.subscriptionEndDate) {
       const gracePeriod = new Date();
       gracePeriod.setDate(gracePeriod.getDate() + 30);
-      restaurant.trialEndsAt = gracePeriod;
+      restaurant.trialEndDate = gracePeriod;
       await restaurant.save();
       return next();
     }
     
     // Check if trial is active
-    const trialActive = restaurant.trialEndsAt && restaurant.trialEndsAt > now;
+    const trialActive = restaurant.trialEndDate && restaurant.trialEndDate > now;
     
     // Check if subscription is active
-    const subscriptionActive = restaurant.subscriptionEndsAt && restaurant.subscriptionEndsAt > now;
+    const subscriptionActive = restaurant.subscriptionEndDate && restaurant.subscriptionEndDate > now;
 
     if (!trialActive && !subscriptionActive) {
       return res.status(402).json({ 
         message: 'Subscription Required', 
         reason: 'Trial or subscription expired',
-        trialEndsAt: restaurant.trialEndsAt,
-        subscriptionEndsAt: restaurant.subscriptionEndsAt
+        trialEndDate: restaurant.trialEndDate,
+        subscriptionEndDate: restaurant.subscriptionEndDate
       });
     }
 
