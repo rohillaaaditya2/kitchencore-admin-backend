@@ -11,8 +11,10 @@ exports.getGlobalStats = async (req, res) => {
     const totalRevenue = allOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
     const totalOrdersCount = allOrders.length;
 
-    const merchants = await Restaurant.find({ role: 'Merchant' }, 'restaurantName email status isActive trialEndsAt subscriptionEndsAt createdAt')
-      .sort({ createdAt: -1 });
+    const merchants = await Restaurant.find(
+      { role: 'Merchant' }, 
+      'restaurantName ownerName email status isActive plan trialStartDate trialEndDate subscriptionStartDate subscriptionEndDate createdAt'
+    ).sort({ createdAt: -1 });
 
     const stats = {
       totalMerchants,
@@ -115,5 +117,26 @@ exports.getMerchantDetails = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch details', error: error.message });
+  }
+};
+exports.updateMerchantStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body; // 'Pending', 'Approved', 'Rejected'
+    const restaurant = await Restaurant.findByIdAndUpdate(id, { status }, { new: true });
+    res.status(200).json({ message: `Status updated to ${status}`, restaurant });
+  } catch (error) {
+    res.status(500).json({ message: 'Update failed', error: error.message });
+  }
+};
+
+exports.updateMerchantSubscription = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body; // e.g. { plan: 'PRO', trialEndDate: '...' }
+    const restaurant = await Restaurant.findByIdAndUpdate(id, updateData, { new: true });
+    res.status(200).json({ message: 'Subscription updated', restaurant });
+  } catch (error) {
+    res.status(500).json({ message: 'Update failed', error: error.message });
   }
 };

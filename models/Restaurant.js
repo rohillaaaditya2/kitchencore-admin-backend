@@ -3,31 +3,48 @@ const bcrypt = require('bcryptjs');
 
 const restaurantSchema = new mongoose.Schema({
   restaurantName: { type: String, required: true },
+  ownerName: { type: String },
   email: { type: String, required: true, unique: true },
   phone: { type: String },
   password: { type: String, required: true },
-  isVerified: { type: Boolean, default: false },
+  
+  // Approval System
   status: { 
     type: String, 
     enum: ['Pending', 'Approved', 'Rejected'], 
     default: 'Pending' 
   },
+  
+  // SaaS Role
   role: { 
     type: String, 
     enum: ['Merchant', 'SuperAdmin'], 
     default: 'Merchant' 
   },
-  otp: { type: String },
-  otpExpiry: { type: Date },
+
   isActive: { type: Boolean, default: true },
-  trialEndsAt: { type: Date },
-  subscriptionEndsAt: { type: Date },
-  planType: { type: String, enum: ['month', 'year', 'none'], default: 'none' },
+  
+  // Subscription & Trial System
+  plan: { 
+    type: String, 
+    enum: ['FREE', 'BASIC', 'PRO', 'PREMIUM'], 
+    default: 'FREE' 
+  },
+  trialStartDate: { type: Date, default: Date.now },
+  trialEndDate: { type: Date },
+  
+  subscriptionStartDate: { type: Date },
+  subscriptionEndDate: { type: Date },
+  
+  // Legacy fields (optional cleanup later)
+  isVerified: { type: Boolean, default: false },
+  otp: { type: String },
+  otpExpiry: { type: Date }
+  
 }, { timestamps: true });
 
 restaurantSchema.pre('save', async function() {
   if (!this.isModified('password')) return;
-  console.log(`[MODEL DEBUG] Hashing password for: ${this.email}`);
   this.password = await bcrypt.hash(this.password, 10);
 });
 

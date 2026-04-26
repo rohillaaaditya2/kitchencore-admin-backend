@@ -77,7 +77,10 @@ router.post('/signup', async (req, res) => {
       password,
       otp,
       otpExpiry,
-      trialEndsAt
+      trialStartDate: Date.now(),
+      trialEndDate: trialEndsAt,
+      status: 'Pending',
+      plan: 'FREE'
     });
 
     try {
@@ -140,12 +143,23 @@ router.post('/login', async (req, res) => {
         }
       }
   
+      // Trial Expiry Check
+      const isExpired = restaurant.plan === 'FREE' && 
+                        restaurant.trialEndDate && 
+                        new Date() > new Date(restaurant.trialEndDate);
+      
       const token = jwt.sign(
-        { id: restaurant._id, role: restaurant.role, status: restaurant.status }, 
+        { 
+          id: restaurant._id, 
+          role: restaurant.role, 
+          status: restaurant.status,
+          plan: restaurant.plan,
+          isExpired 
+        }, 
         process.env.JWT_SECRET || 'secret', 
         { expiresIn: '1d' }
       );
-      res.status(200).json({ token, restaurant });
+      res.status(200).json({ token, restaurant, isExpired });
     } catch (error) {
       res.status(500).json({ message: 'Login failed', error: error.message });
     }

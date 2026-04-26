@@ -3,6 +3,7 @@ const router = express.Router();
 const billingController = require('../controllers/billingController');
 const authMiddleware = require('../middleware/auth');
 
+router.get('/status', authMiddleware, billingController.getSubscriptionStatus);
 router.post('/create-order', authMiddleware, billingController.createOrder);
 router.post('/verify', authMiddleware, billingController.verifyPayment);
 

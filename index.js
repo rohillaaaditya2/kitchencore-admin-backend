@@ -20,7 +20,9 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
+const demoSessionRoutes = require('./routes/demoSessionRoutes');
 const billingMiddleware = require('./middleware/billing');
+const checkSubscription = require('./middleware/checkSubscription');
 
 const path = require('path');
 const app = express();
@@ -28,25 +30,26 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-app.use('/api/orders', orderRoutes);
-app.use('/api/reviews', reviewRoutes);
-app.use('/api/inventory', inventoryRoutes);
+app.use('/api/orders', billingMiddleware, checkSubscription, orderRoutes);
+app.use('/api/reviews', billingMiddleware, checkSubscription, reviewRoutes);
+app.use('/api/inventory', billingMiddleware, checkSubscription, inventoryRoutes);
 app.get('/api/inventory-test-v2', (req, res) => res.json({ status: 'ok', version: '2.0.1' }));
 app.get('/api/inventory-status', (req, res) => res.json({ status: 'ok', msg: 'Route is at the top' }));
-app.use('/api/products', productRoutes);
+app.use('/api/products', billingMiddleware, checkSubscription, productRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/promos', billingMiddleware, promoRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/platform-config', platformConfigRoutes);
-app.use('/api/waiter-requests', waiterRoutes);
-app.use('/api/billing', billingRoutes);
+app.use('/api/waiter-requests', billingMiddleware, checkSubscription, waiterRoutes);
+app.use('/api/billing', billingMiddleware, billingRoutes); // status must work even when expired
 app.use('/api/super-admin', superAdminRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/purchases', purchaseRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/expenses', expenseRoutes);
+app.use('/api/customers', billingMiddleware, checkSubscription, customerRoutes);
+app.use('/api/notifications', billingMiddleware, checkSubscription, notificationRoutes);
+app.use('/api/purchases', billingMiddleware, checkSubscription, purchaseRoutes);
+app.use('/api/reports', billingMiddleware, checkSubscription, reportRoutes);
+app.use('/api/expenses', billingMiddleware, checkSubscription, expenseRoutes);
+app.use('/api/demo-sessions', demoSessionRoutes);
 // --- SUPER ADMIN ROUTES ---
 const adminAuth = require('./middleware/adminAuth');
 const DemoRequest = require('./models/DemoRequest');

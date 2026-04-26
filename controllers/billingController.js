@@ -8,31 +8,41 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder'
 });
 
+// Plan Pricing Configuration (Can be moved to PlatformConfig later)
+const PLAN_PRICES = {
+  'BASIC': 999,    // ₹999/month
+  'PRO': 1999,     // ₹1999/month
+  'PREMIUM': 4999  // ₹4999/month
+};
+
 exports.createOrder = async (req, res) => {
   try {
-    const { planType } = req.body; // 'month' or 'year'
+    const { plan } = req.body; // 'BASIC', 'PRO', 'PREMIUM'
     const restaurantId = req.restaurantId;
 
-    if (!['month', 'year'].includes(planType)) {
-      return res.status(400).json({ message: 'Invalid plan type' });
+    if (!PLAN_PRICES[plan]) {
+      return res.status(400).json({ message: 'Invalid plan selected' });
     }
 
-    const config = await PlatformConfig.findOne();
-    if (!config) return res.status(500).json({ message: 'Platform configuration not found' });
-
-    const amount = planType === 'month' ? config.monthlyPrice : config.yearlyPrice;
+    const amount = PLAN_PRICES[plan];
     
     const options = {
       amount: amount * 100, // razorpay expects amount in paise
       currency: "INR",
       receipt: `receipt_${restaurantId}_${Date.now()}`,
+      notes: {
+        restaurantId,
+        plan
+      }
     };
 
     const order = await razorpay.orders.create(options);
     res.status(200).json({
       orderId: order.id,
       amount: order.amount,
-      keyId: process.env.RAZORPAY_KEY_ID
+      keyId: process.env.RAZORPAY_KEY_ID,
+      currency: "INR",
+      plan
     });
   } catch (error) {
     console.error('Razorpay Order Error:', error);
@@ -46,7 +56,7 @@ exports.verifyPayment = async (req, res) => {
       razorpay_order_id, 
       razorpay_payment_id, 
       razorpay_signature,
-      planType 
+      plan 
     } = req.body;
     const restaurantId = req.restaurantId;
 
@@ -62,24 +72,23 @@ exports.verifyPayment = async (req, res) => {
       if (!restaurant) return res.status(404).json({ message: 'Restaurant not found' });
 
       const now = new Date();
-      let newExpiry;
       
-      // Extend from current expiry if it's in the future, otherwise from now
-      const currentExpiry = restaurant.subscriptionEndsAt || now;
-      const baseDate = currentExpiry > now ? currentExpiry : now;
+      // Calculate new expiry (30 days from now)
+      const newExpiry = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-      if (planType === 'month') {
-        newExpiry = new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000);
-      } else {
-        newExpiry = new Date(baseDate.getTime() + 365 * 24 * 60 * 60 * 1000);
-      }
-
-      restaurant.subscriptionEndsAt = newExpiry;
-      restaurant.planType = planType;
+      restaurant.subscriptionStartDate = now;
+      restaurant.subscriptionEndDate = newExpiry;
+      restaurant.plan = plan;
+      restaurant.status = 'Approved'; // Ensure they are approved if they paid
       restaurant.isActive = true;
+      
       await restaurant.save();
 
-      res.status(200).json({ message: 'Payment verified and subscription extended!', expiry: newExpiry });
+      res.status(200).json({ 
+        message: 'Subscription activated successfully!', 
+        plan,
+        expiry: newExpiry 
+      });
     } else {
       res.status(400).json({ message: 'Invalid payment signature' });
     }
@@ -87,4 +96,40 @@ exports.verifyPayment = async (req, res) => {
     console.error('Razorpay Verify Error:', error);
     res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
+};
+
+exports.getSubscriptionStatus = async (req, res) => {
+    try {
+        const restaurant = await Restaurant.findById(req.restaurantId).select('plan trialEndDate subscriptionEndDate status');
+        if (!restaurant) return res.status(404).json({ message: 'Not found' });
+
+        const now = new Date();
+        let status = 'ACTIVE';
+        let daysLeft = 0;
+
+        if (restaurant.plan === 'FREE') {
+            if (now > new Date(restaurant.trialEndDate)) {
+                status = 'EXPIRED';
+            } else {
+                status = 'TRIAL';
+                daysLeft = Math.ceil((new Date(restaurant.trialEndDate) - now) / (1000 * 60 * 60 * 24));
+            }
+        } else {
+            if (now > new Date(restaurant.subscriptionEndDate)) {
+                status = 'EXPIRED';
+            } else {
+                status = 'PAID';
+                daysLeft = Math.ceil((new Date(restaurant.subscriptionEndDate) - now) / (1000 * 60 * 60 * 24));
+            }
+        }
+
+        res.json({
+            plan: restaurant.plan,
+            status,
+            daysLeft,
+            expiryDate: restaurant.plan === 'FREE' ? restaurant.trialEndDate : restaurant.subscriptionEndDate
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 };
