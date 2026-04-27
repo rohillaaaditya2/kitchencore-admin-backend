@@ -5,20 +5,23 @@ const billingMiddleware = async (req, res, next) => {
     const restaurantId = req.restaurantId || req.body.restaurantId;
     if (!restaurantId) return next();
 
-    // CUSTOMER ORDER & POS BYPASS: Always allow orders to be placed
-    if ((req.originalUrl.includes('/api/orders') || req.originalUrl.includes('/api/products')) && req.method === 'POST') {
-      return next();
-    }
+    // DEBUG: Log the request
+    console.log(`Billing Check: ${req.method} ${req.originalUrl}`);
+
+    // Always allow critical operations (Orders, Menu viewing, Promo validation)
+    const isCritical = req.originalUrl.includes('/orders') || 
+                       req.originalUrl.includes('/products') || 
+                       req.originalUrl.includes('/promos/validate') ||
+                       req.originalUrl.includes('/settings');
     
-    // Always allow GET requests for products and settings to prevent UI lock
-    if (req.method === 'GET' && (req.originalUrl.includes('/api/products') || req.originalUrl.includes('/api/settings'))) {
+    if (isCritical) {
       return next();
     }
     
     // For order status updates from customers, skip subscription check if no ID found
     // (though createOrder always sends it)
 
-    const restaurant = await Restaurant.findById(restaurantId).select('role trialEndDate subscriptionEndDate').lean();
+    const restaurant = await Restaurant.findById(restaurantId);
     if (!restaurant) return next();
 
     // SuperAdmin is exempt
@@ -30,7 +33,7 @@ const billingMiddleware = async (req, res, next) => {
     // auto-grant a 30-day grace period and save it so they aren't immediately blocked.
     if (!restaurant.trialEndDate && !restaurant.subscriptionEndDate) {
       const gracePeriod = new Date();
-      gracePeriod.setDate(gracePeriod.getDate() + 30);
+      gracePeriod.setDate(gracePeriod.getDate() + 90);
       restaurant.trialEndDate = gracePeriod;
       await restaurant.save();
       return next();
@@ -44,8 +47,8 @@ const billingMiddleware = async (req, res, next) => {
 
     if (!trialActive && !subscriptionActive) {
       return res.status(402).json({ 
-        message: 'BYPASS_FAILED_DEBUG', 
-        reason: 'Trial or subscription expired',
+        message: 'Subscription Required', 
+        reason: 'Your trial or subscription has expired.',
         trialEndDate: restaurant.trialEndDate,
         subscriptionEndDate: restaurant.subscriptionEndDate
       });
