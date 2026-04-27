@@ -1,4 +1,5 @@
 require('dotenv').config();
+console.log('--- REBUILD TRIGGER: ' + new Date().toISOString() + ' ---');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');

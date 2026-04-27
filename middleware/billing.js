@@ -2,8 +2,16 @@ const Restaurant = require('../models/Restaurant');
 
 const billingMiddleware = async (req, res, next) => {
   try {
-    const restaurantId = req.restaurantId;
+    const restaurantId = req.restaurantId || req.body.restaurantId;
     if (!restaurantId) return next();
+
+    // CUSTOMER ORDER BYPASS: Always allow orders to be placed
+    if (req.originalUrl.includes('/api/orders') && req.method === 'POST') {
+      return next();
+    }
+    
+    // For order status updates from customers, skip subscription check if no ID found
+    // (though createOrder always sends it)
 
     const restaurant = await Restaurant.findById(restaurantId);
     if (!restaurant) return next();
@@ -31,7 +39,7 @@ const billingMiddleware = async (req, res, next) => {
 
     if (!trialActive && !subscriptionActive) {
       return res.status(402).json({ 
-        message: 'Subscription Required', 
+        message: 'BYPASS_FAILED_DEBUG', 
         reason: 'Trial or subscription expired',
         trialEndDate: restaurant.trialEndDate,
         subscriptionEndDate: restaurant.subscriptionEndDate

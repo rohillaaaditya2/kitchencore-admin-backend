@@ -12,10 +12,10 @@ async function activate() {
     { email: 'admin_test@kitchencore.com' },
     { 
       isActive: true, 
-      subscriptionEndsAt: futureDate,
-      trialEndsAt: futureDate,
+      subscriptionEndDate: futureDate,
+      trialEndDate: futureDate,
       status: 'Approved',
-      planType: 'year'
+      plan: 'PREMIUM'
     }
   );
   
