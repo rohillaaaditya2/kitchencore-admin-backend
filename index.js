@@ -41,7 +41,12 @@ app.use('/api/orders', (req, res, next) => {
 app.use('/api/reviews', billingMiddleware, reviewRoutes);
 app.use('/api/inventory', billingMiddleware, inventoryRoutes);
 app.get('/api/inventory-test-v2', (req, res) => res.json({ status: 'ok', "version": "1.0.1-deploy-fix-402" }));
-app.get('/api/inventory-status', (req, res) => res.json({ status: 'ok', msg: 'Route is at the top' }));
+app.get('/api/inventory-status', (req, res) => res.json({ 
+  status: 'ok', 
+  time: new Date().toISOString(),
+  version: '1.0.1-deploy-fix-402-v2',
+  env: process.env.NODE_ENV
+}));
 app.use('/api/products', billingMiddleware, productRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', settingsRoutes);
