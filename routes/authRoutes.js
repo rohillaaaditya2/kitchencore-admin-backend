@@ -67,7 +67,7 @@ router.post('/signup', async (req, res) => {
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
     const config = await PlatformConfig.findOne();
-    const trialDays = config ? config.freeTrialDays : 14;
+    const trialDays = config ? config.freeTrialDays : 90;
     const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
     const restaurant = await Restaurant.create({

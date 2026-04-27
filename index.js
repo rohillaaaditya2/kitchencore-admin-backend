@@ -148,9 +148,11 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/pizzatown')
   .then(() => {
     console.log('Connected to MongoDB');
     if (!process.env.VERCEL) {
-      startAutoStatusSweep();
-      startPurchaseCleanupSweep();
-      startInventoryStockBlocker();
+      setTimeout(() => {
+        startAutoStatusSweep();
+        startPurchaseCleanupSweep();
+        startInventoryStockBlocker();
+      }, 5000);
     }
   })
   .catch(err => console.error('MongoDB connection error:', err));
@@ -168,8 +170,7 @@ function startAutoStatusSweep() {
         const prepStart = order.prepTimeUpdatedAt ? new Date(order.prepTimeUpdatedAt).getTime() : new Date(order.createdAt).getTime();
         const durationMs = (order.estimatedPrepTime || 15) * 60 * 1000;
         if (now >= (prepStart + durationMs)) {
-          order.status = 'Served';
-          await order.save();
+          await Order.updateOne({ _id: order._id }, { $set: { status: 'Served' } });
           console.log(`Auto-serving order #${order.orderId}`);
         }
       }

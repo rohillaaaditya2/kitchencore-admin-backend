@@ -5,15 +5,20 @@ const billingMiddleware = async (req, res, next) => {
     const restaurantId = req.restaurantId || req.body.restaurantId;
     if (!restaurantId) return next();
 
-    // CUSTOMER ORDER BYPASS: Always allow orders to be placed
-    if (req.originalUrl.includes('/api/orders') && req.method === 'POST') {
+    // CUSTOMER ORDER & POS BYPASS: Always allow orders to be placed
+    if ((req.originalUrl.includes('/api/orders') || req.originalUrl.includes('/api/products')) && req.method === 'POST') {
+      return next();
+    }
+    
+    // Always allow GET requests for products and settings to prevent UI lock
+    if (req.method === 'GET' && (req.originalUrl.includes('/api/products') || req.originalUrl.includes('/api/settings'))) {
       return next();
     }
     
     // For order status updates from customers, skip subscription check if no ID found
     // (though createOrder always sends it)
 
-    const restaurant = await Restaurant.findById(restaurantId);
+    const restaurant = await Restaurant.findById(restaurantId).select('role trialEndDate subscriptionEndDate').lean();
     if (!restaurant) return next();
 
     // SuperAdmin is exempt
