@@ -321,7 +321,7 @@ exports.exportPDF = async (req, res) => {
     doc.fontSize(10).fillColor('#64748b').text(`Period: ${range} (${new Date(dateQuery.$gte).toLocaleDateString()} - ${new Date(dateQuery.$lte).toLocaleDateString()})`);
     doc.moveDown();
 
-    else if (type === 'inventory') {
+    if (type === 'inventory') {
       const ingredients = await Ingredient.find({ restaurantId });
       
       const totalItems = ingredients.length;
@@ -460,7 +460,7 @@ exports.exportPDF = async (req, res) => {
       return res.send(pdfBuffer);
     }
 
-    else if (type === 'purchases') {
+    if (type === 'purchases') {
       const purchases = await Purchase.find({ restaurantId, purchaseDate: dateQuery }).sort({ purchaseDate: -1 });
       const total = purchases.reduce((sum, p) => sum + p.totalAmount, 0);
 
