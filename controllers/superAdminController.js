@@ -119,6 +119,7 @@ exports.getMerchantDetails = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch details', error: error.message });
   }
 };
+
 exports.updateMerchantStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -133,10 +134,29 @@ exports.updateMerchantStatus = async (req, res) => {
 exports.updateMerchantSubscription = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body; // e.g. { plan: 'PRO', trialEndDate: '...' }
-    const restaurant = await Restaurant.findByIdAndUpdate(id, updateData, { new: true });
-    res.status(200).json({ message: 'Subscription updated', restaurant });
+    const { trialEndDate, subscriptionEndDate, plan, isActive } = req.body;
+    
+    const restaurant = await Restaurant.findById(id);
+    if (!restaurant) return res.status(404).json({ message: 'Merchant not found' });
+
+    if (trialEndDate !== undefined) restaurant.trialEndDate = trialEndDate;
+    if (subscriptionEndDate !== undefined) restaurant.subscriptionEndDate = subscriptionEndDate;
+    if (plan !== undefined) restaurant.plan = plan;
+    if (isActive !== undefined) restaurant.isActive = isActive;
+
+    await restaurant.save();
+    res.status(200).json({ 
+      message: 'Merchant subscription updated successfully!', 
+      restaurant: {
+        id: restaurant._id,
+        restaurantName: restaurant.restaurantName,
+        trialEndDate: restaurant.trialEndDate,
+        subscriptionEndDate: restaurant.subscriptionEndDate,
+        plan: restaurant.plan,
+        isActive: restaurant.isActive
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Update failed', error: error.message });
+    res.status(500).json({ message: 'Failed to update subscription', error: error.message });
   }
 };

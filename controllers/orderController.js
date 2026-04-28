@@ -12,6 +12,34 @@ exports.createOrder = async (req, res) => {
     const { items, totalAmount, customerPhone, customerName, tableNumber, diningOption, packagingCharge, promoDiscount, promoCodeUsed, loyaltyDiscount, source, status, paymentStatus, paymentMethod, restaurantId } = req.body;
     if (!restaurantId) return res.status(400).json({ message: 'Restaurant ID is required' });
 
+    // SUBSCRIPTION CHECK
+    const restaurant = await Restaurant.findById(restaurantId);
+    if (restaurant && restaurant.role !== 'SuperAdmin') {
+      const now = new Date();
+      
+      // AUTO-TRIAL GRACE PERIOD (90 Days)
+      // If no trial date is set at all, grant 90 days.
+      if (!restaurant.trialEndDate && !restaurant.subscriptionEndDate) {
+        const gracePeriod = new Date();
+        gracePeriod.setDate(gracePeriod.getDate() + 90);
+        restaurant.trialEndDate = gracePeriod;
+        await restaurant.save();
+        console.log(`[SUBSCRIPTION] Auto-granted 90-day trial to: ${restaurant.restaurantName}`);
+      }
+
+      const trialActive = restaurant.trialEndDate && new Date(restaurant.trialEndDate) > now;
+      const subActive = restaurant.subscriptionEndDate && new Date(restaurant.subscriptionEndDate) > now;
+      
+      if (!trialActive && !subActive) {
+        return res.status(402).json({ 
+          message: 'This restaurant\'s service is temporarily suspended due to expired subscription.',
+          reason: 'Your trial or subscription has expired.',
+          trialEndDate: restaurant.trialEndDate,
+          subscriptionEndDate: restaurant.subscriptionEndDate
+        });
+      }
+    }
+
     const orderId = req.body.orderId || Math.floor(1000 + Math.random() * 9000).toString();
     
     const newOrder = new Order({
