@@ -305,7 +305,6 @@ exports.exportPDF = async (req, res) => {
       res.setHeader('Content-Disposition', `attachment; filename=KitchenCore_Sales_Report.pdf`);
       return res.send(pdfBuffer);
     } 
-    } 
     
     if (type === 'inventory') {
       const ingredients = await Ingredient.find({ restaurantId });
