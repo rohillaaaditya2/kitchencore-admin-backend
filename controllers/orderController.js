@@ -4,6 +4,7 @@ const Customer = require('../models/Customer');
 const Product = require('../models/Product');
 const Ingredient = require('../models/Ingredient');
 const InventoryLog = require('../models/InventoryLog');
+const PlatformConfig = require('../models/PlatformConfig');
 const { sendNotification } = require('../socket');
 
 // Create a new order
@@ -17,14 +18,17 @@ exports.createOrder = async (req, res) => {
     if (restaurant && restaurant.role !== 'SuperAdmin') {
       const now = new Date();
       
-      // AUTO-TRIAL GRACE PERIOD (90 Days)
-      // If no trial date is set at all, grant 90 days.
+      // AUTO-TRIAL GRACE PERIOD (Managed by Super Admin)
+      // If no trial date is set at all, use PlatformConfig default
       if (!restaurant.trialEndDate && !restaurant.subscriptionEndDate) {
+        const config = await PlatformConfig.findOne();
+        const trialDays = config ? (config.freeTrialDays || 90) : 90;
+        
         const gracePeriod = new Date();
-        gracePeriod.setDate(gracePeriod.getDate() + 90);
+        gracePeriod.setDate(gracePeriod.getDate() + trialDays);
         restaurant.trialEndDate = gracePeriod;
         await restaurant.save();
-        console.log(`[SUBSCRIPTION] Auto-granted 90-day trial to: ${restaurant.restaurantName}`);
+        console.log(`[SUBSCRIPTION] Auto-granted ${trialDays}-day trial to: ${restaurant.restaurantName}`);
       }
 
       const trialActive = restaurant.trialEndDate && new Date(restaurant.trialEndDate) > now;

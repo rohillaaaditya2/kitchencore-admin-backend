@@ -1,4 +1,5 @@
 const Restaurant = require('../models/Restaurant');
+const PlatformConfig = require('../models/PlatformConfig');
 
 const billingMiddleware = async (req, res, next) => {
   try {
@@ -14,13 +15,16 @@ const billingMiddleware = async (req, res, next) => {
     const now = new Date();
     
     // If no trial date is set at all (legacy account created before billing system),
-    // auto-grant a 90-day grace period and save it so they aren't immediately blocked.
+    // auto-grant a grace period based on PlatformConfig and save it so they aren't immediately blocked.
     if (!restaurant.trialEndDate && !restaurant.subscriptionEndDate) {
+      const config = await PlatformConfig.findOne();
+      const trialDays = config ? (config.freeTrialDays || 90) : 90;
+
       const gracePeriod = new Date();
-      gracePeriod.setDate(gracePeriod.getDate() + 90);
+      gracePeriod.setDate(gracePeriod.getDate() + trialDays);
       restaurant.trialEndDate = gracePeriod;
       await restaurant.save();
-      console.log(`[SUBSCRIPTION] Auto-granted 90-day trial via middleware: ${restaurant.restaurantName}`);
+      console.log(`[SUBSCRIPTION] Auto-granted ${trialDays}-day trial via middleware: ${restaurant.restaurantName}`);
       return next();
     }
     
