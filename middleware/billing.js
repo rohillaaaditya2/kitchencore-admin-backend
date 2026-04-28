@@ -4,7 +4,7 @@ const PlatformConfig = require('../models/PlatformConfig');
 const billingMiddleware = async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || req.body.restaurantId || req.query.restaurantId;
-    if (!restaurantId || !restaurantId.match(/^[0-9a-fA-F]{24}$/)) return next();
+    if (!restaurantId || !String(restaurantId).match(/^[0-9a-fA-F]{24}$/)) return next();
 
     const restaurant = await Restaurant.findById(restaurantId);
     if (!restaurant) return next();

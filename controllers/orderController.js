@@ -11,7 +11,7 @@ const { sendNotification } = require('../socket');
 exports.createOrder = async (req, res) => {
   try {
     const { items, totalAmount, customerPhone, customerName, tableNumber, diningOption, packagingCharge, promoDiscount, promoCodeUsed, loyaltyDiscount, source, status, paymentStatus, paymentMethod, restaurantId } = req.body;
-    if (!restaurantId || !restaurantId.match(/^[0-9a-fA-F]{24}$/)) return res.status(400).json({ message: 'Valid Restaurant ID is required' });
+    if (!restaurantId || !String(restaurantId).match(/^[0-9a-fA-F]{24}$/)) return res.status(400).json({ message: 'Valid Restaurant ID is required' });
 
     // SUBSCRIPTION CHECK
     const restaurant = await Restaurant.findById(restaurantId);
