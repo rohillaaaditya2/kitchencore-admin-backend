@@ -18,19 +18,6 @@ exports.createOrder = async (req, res) => {
     if (restaurant && restaurant.role !== 'SuperAdmin') {
       const now = new Date();
       
-      // AUTO-TRIAL GRACE PERIOD (Managed by Super Admin)
-      // If no trial date is set at all, use PlatformConfig default
-      if (!restaurant.trialEndDate && !restaurant.subscriptionEndDate) {
-        const config = await PlatformConfig.findOne();
-        const trialDays = config ? (config.freeTrialDays || 90) : 90;
-        
-        const gracePeriod = new Date();
-        gracePeriod.setDate(gracePeriod.getDate() + trialDays);
-        restaurant.trialEndDate = gracePeriod;
-        await restaurant.save();
-        console.log(`[SUBSCRIPTION] Auto-granted ${trialDays}-day trial to: ${restaurant.restaurantName}`);
-      }
-
       const trialActive = restaurant.trialEndDate && new Date(restaurant.trialEndDate) > now;
       const subActive = restaurant.subscriptionEndDate && new Date(restaurant.subscriptionEndDate) > now;
       
