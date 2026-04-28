@@ -139,8 +139,14 @@ exports.updateMerchantSubscription = async (req, res) => {
     const restaurant = await Restaurant.findById(id);
     if (!restaurant) return res.status(404).json({ message: 'Merchant not found' });
 
-    if (trialEndDate !== undefined) restaurant.trialEndDate = trialEndDate;
-    if (subscriptionEndDate !== undefined) restaurant.subscriptionEndDate = subscriptionEndDate;
+    if (trialEndDate !== undefined) {
+      restaurant.trialEndDate = trialEndDate;
+      restaurant.trialEndsAt = trialEndDate; // Backward compatibility
+    }
+    if (subscriptionEndDate !== undefined) {
+      restaurant.subscriptionEndDate = subscriptionEndDate;
+      restaurant.subscriptionEndsAt = subscriptionEndDate; // Backward compatibility
+    }
     if (plan !== undefined) restaurant.plan = plan;
     if (isActive !== undefined) restaurant.isActive = isActive;
 
