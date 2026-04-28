@@ -44,7 +44,7 @@ app.get('/api/inventory-test-v2', (req, res) => res.json({ status: 'ok', "versio
 app.get('/api/inventory-status', (req, res) => res.json({ 
   status: 'ok', 
   time: new Date().toISOString(),
-  version: '1.0.1-deploy-fix-402-v2',
+  version: '1.0.2-signup-fix-verified',
   env: process.env.NODE_ENV
 }));
 app.use('/api/products', billingMiddleware, productRoutes);
