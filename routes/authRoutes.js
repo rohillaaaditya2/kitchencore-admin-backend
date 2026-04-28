@@ -51,6 +51,8 @@ router.post('/signup', async (req, res) => {
     let existing = await Restaurant.findOne({ email });
     if (existing) return res.status(400).json({ message: 'Email already exists' });
 
+    // RELAXED SIGNUP: We no longer require a pre-booked demo to create an account
+    /*
     const strictDemo = await DemoRequest.findOne({
       phone: cleanPhone,
       restaurant: { $regex: new RegExp("^" + cleanRestaurantName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "$", "i") }
@@ -62,6 +64,7 @@ router.post('/signup', async (req, res) => {
          noDemo: true 
        });
     }
+    */
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);

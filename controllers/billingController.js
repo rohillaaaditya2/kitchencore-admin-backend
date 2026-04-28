@@ -112,7 +112,10 @@ exports.getSubscriptionStatus = async (req, res) => {
                 status = 'EXPIRED';
             } else {
                 status = 'TRIAL';
-                daysLeft = Math.ceil((new Date(restaurant.trialEndDate) - now) / (1000 * 60 * 60 * 24));
+                const diff = new Date(restaurant.trialEndDate) - now;
+                daysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+                // Cap trial days to 90 for display sanity
+                if (daysLeft > 90) daysLeft = 90; 
             }
         } else {
             if (now > new Date(restaurant.subscriptionEndDate)) {

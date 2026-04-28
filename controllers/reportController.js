@@ -305,22 +305,8 @@ exports.exportPDF = async (req, res) => {
       res.setHeader('Content-Disposition', `attachment; filename=KitchenCore_Sales_Report.pdf`);
       return res.send(pdfBuffer);
     } 
-
-    // Legacy PDFKit fallback for other report types
-    const doc = new PDFDocument({ margin: 30, size: 'A4' });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=KitchenCore_${type}_Report.pdf`);
-    doc.pipe(res);
-
-    // Header
-    doc.fontSize(20).fillColor('#f97316').text('KitchenCore', { align: 'right' });
-    doc.fontSize(10).fillColor('#64748b').text(restaurant?.restaurantName || 'Restaurant Report', { align: 'right' });
-    doc.moveDown();
-
-    doc.fontSize(18).fillColor('#0f172a').text(`${type.toUpperCase()} REPORT`, { underline: true });
-    doc.fontSize(10).fillColor('#64748b').text(`Period: ${range} (${new Date(dateQuery.$gte).toLocaleDateString()} - ${new Date(dateQuery.$lte).toLocaleDateString()})`);
-    doc.moveDown();
-
+    } 
+    
     if (type === 'inventory') {
       const ingredients = await Ingredient.find({ restaurantId });
       
@@ -459,6 +445,21 @@ exports.exportPDF = async (req, res) => {
       res.setHeader('Content-Disposition', `attachment; filename=KitchenCore_Inventory_Report.pdf`);
       return res.send(pdfBuffer);
     }
+
+    // Legacy PDFKit fallback for other report types
+    const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=KitchenCore_${type}_Report.pdf`);
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(20).fillColor('#f97316').text('KitchenCore', { align: 'right' });
+    doc.fontSize(10).fillColor('#64748b').text(restaurant?.restaurantName || 'Restaurant Report', { align: 'right' });
+    doc.moveDown();
+
+    doc.fontSize(18).fillColor('#0f172a').text(`${type.toUpperCase()} REPORT`, { underline: true });
+    doc.fontSize(10).fillColor('#64748b').text(`Period: ${range} (${new Date(dateQuery.$gte).toLocaleDateString()} - ${new Date(dateQuery.$lte).toLocaleDateString()})`);
+    doc.moveDown();
 
     if (type === 'purchases') {
       const purchases = await Purchase.find({ restaurantId, purchaseDate: dateQuery }).sort({ purchaseDate: -1 });
