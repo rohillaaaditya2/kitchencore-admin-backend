@@ -72,7 +72,7 @@ exports.createOrder = async (req, res) => {
     // Auto Inventory Deduction with Logging
     try {
       for (const item of items) {
-        const productId = item.id || item._id;
+        const productId = item.productId || item.id || item._id;
         if (productId) {
           const product = await Product.findById(productId);
           if (product && product.recipe && product.recipe.length > 0) {
@@ -110,7 +110,7 @@ exports.createOrder = async (req, res) => {
     if (customerPhone) {
       try {
         const itemUpdateData = items.map(item => ({
-          productId: item.id || item._id,
+          productId: item.productId || item.id || item._id,
           name: item.name,
           count: item.quantity || 1
         }));
