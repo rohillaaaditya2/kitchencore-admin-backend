@@ -17,16 +17,23 @@ exports.createOrder = async (req, res) => {
     const restaurant = await Restaurant.findById(restaurantId);
     if (restaurant && restaurant.role !== 'SuperAdmin') {
       const now = new Date();
+      const trialDate = restaurant.trialEndDate || restaurant.trialEndsAt;
+      const subDate = restaurant.subscriptionEndDate || restaurant.subscriptionEndsAt;
+
+      const trialActive = trialDate && new Date(trialDate) > now;
+      const subActive = subDate && new Date(subDate) > now;
       
-      const trialActive = (restaurant.trialEndDate || restaurant.trialEndsAt) && new Date(restaurant.trialEndDate || restaurant.trialEndsAt) > now;
-      const subActive = (restaurant.subscriptionEndDate || restaurant.subscriptionEndsAt) && new Date(restaurant.subscriptionEndDate || restaurant.subscriptionEndsAt) > now;
-      
+      console.log(`[SUBSCRIPTION DEBUG] Restaurant: ${restaurant.restaurantName}`);
+      console.log(`Trial: ${trialDate} (Active: ${trialActive})`);
+      console.log(`Sub: ${subDate} (Active: ${subActive})`);
+
       if (!trialActive && !subActive) {
+        console.warn(`[SUBSCRIPTION BLOCKED] ${restaurant.restaurantName} attempt blocked. Expired.`);
         return res.status(402).json({ 
           message: 'This restaurant\'s service is temporarily suspended due to expired subscription.',
           reason: 'Your trial or subscription has expired.',
-          trialEndDate: restaurant.trialEndDate,
-          subscriptionEndDate: restaurant.subscriptionEndDate
+          trialEndDate: trialDate,
+          subscriptionEndDate: subDate
         });
       }
     }
