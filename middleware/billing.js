@@ -15,10 +15,10 @@ const billingMiddleware = async (req, res, next) => {
     const now = new Date();
     
     // Check if trial is active
-    const trialActive = restaurant.trialEndDate && new Date(restaurant.trialEndDate) > now;
+    const trialActive = (restaurant.trialEndDate || restaurant.trialEndsAt) && new Date(restaurant.trialEndDate || restaurant.trialEndsAt) > now;
     
     // Check if subscription is active
-    const subscriptionActive = restaurant.subscriptionEndDate && new Date(restaurant.subscriptionEndDate) > now;
+    const subscriptionActive = (restaurant.subscriptionEndDate || restaurant.subscriptionEndsAt) && new Date(restaurant.subscriptionEndDate || restaurant.subscriptionEndsAt) > now;
 
     if (!trialActive && !subscriptionActive) {
       return res.status(402).json({ 

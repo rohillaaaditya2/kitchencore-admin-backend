@@ -18,8 +18,8 @@ exports.createOrder = async (req, res) => {
     if (restaurant && restaurant.role !== 'SuperAdmin') {
       const now = new Date();
       
-      const trialActive = restaurant.trialEndDate && new Date(restaurant.trialEndDate) > now;
-      const subActive = restaurant.subscriptionEndDate && new Date(restaurant.subscriptionEndDate) > now;
+      const trialActive = (restaurant.trialEndDate || restaurant.trialEndsAt) && new Date(restaurant.trialEndDate || restaurant.trialEndsAt) > now;
+      const subActive = (restaurant.subscriptionEndDate || restaurant.subscriptionEndsAt) && new Date(restaurant.subscriptionEndDate || restaurant.subscriptionEndsAt) > now;
       
       if (!trialActive && !subActive) {
         return res.status(402).json({ 
