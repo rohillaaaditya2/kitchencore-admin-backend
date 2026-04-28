@@ -143,23 +143,36 @@ router.post('/login', async (req, res) => {
         }
       }
   
-      // Trial Expiry Check
-      const isExpired = restaurant.plan === 'FREE' && 
-                        restaurant.trialEndDate && 
-                        new Date() > new Date(restaurant.trialEndDate);
-      
+      // Subscription / Trial Expiry Check
+      if (restaurant.role !== 'SuperAdmin') {
+        const now = new Date();
+        const trialDate = restaurant.trialEndDate || restaurant.trialEndsAt;
+        const subDate = restaurant.subscriptionEndDate || restaurant.subscriptionEndsAt;
+
+        const trialActive = trialDate && new Date(trialDate) > now;
+        const subActive = subDate && new Date(subDate) > now;
+
+        if (!trialActive && !subActive) {
+          return res.status(403).json({ 
+            message: 'Your subscription has expired. Access denied.', 
+            isExpired: true,
+            trialEndDate: trialDate,
+            subscriptionEndDate: subDate
+          });
+        }
+      }
+  
       const token = jwt.sign(
         { 
           id: restaurant._id, 
           role: restaurant.role, 
           status: restaurant.status,
-          plan: restaurant.plan,
-          isExpired 
+          plan: restaurant.plan
         }, 
         process.env.JWT_SECRET || 'secret', 
         { expiresIn: '1d' }
       );
-      res.status(200).json({ token, restaurant, isExpired });
+      res.status(200).json({ token, restaurant });
     } catch (error) {
       res.status(500).json({ message: 'Login failed', error: error.message });
     }
