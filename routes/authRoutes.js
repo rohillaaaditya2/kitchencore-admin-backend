@@ -83,7 +83,10 @@ router.post('/signup', async (req, res) => {
       trialStartDate: Date.now(),
       trialEndDate: trialEndsAt,
       status: 'Pending',
-      plan: 'FREE'
+      plan: 'FREE',
+      loginMethod: 'email',
+      registrationIP: req.ip || req.headers['x-forwarded-for'],
+      registrationDevice: req.get('user-agent')
     });
 
     try {

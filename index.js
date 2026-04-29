@@ -26,10 +26,14 @@ const demoSessionRoutes = require('./routes/demoSessionRoutes');
 const billingMiddleware = require('./middleware/billing');
 const checkSubscription = require('./middleware/checkSubscription');
 
+const activityLogger = require('./middleware/activityLogger');
+const errorLogger = require('./middleware/errorLogger');
+
 const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(activityLogger);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/orders', (req, res, next) => {
@@ -63,85 +67,9 @@ app.use('/api/reports', billingMiddleware, reportRoutes);
 app.use('/api/expenses', billingMiddleware, expenseRoutes);
 app.use('/api/demo-sessions', demoSessionRoutes);
 
-// --- SUPER ADMIN ROUTES ---
-const adminAuth = require('./middleware/adminAuth');
-const DemoRequest = require('./models/DemoRequest');
-const Restaurant = require('./models/Restaurant');
-const jwt = require('jsonwebtoken');
+app.use(errorLogger);
 
-app.post('/api/demo-request', async (req, res) => {
-  try {
-    const { name, phone, restaurant, city, outletType } = req.body;
-    if (!name || !phone || !restaurant || !city) return res.status(400).json({ message: 'Missing fields' });
-    const demo = await DemoRequest.create({ name, phone, restaurant, city, outletType: outletType || 'Fine Dine' });
-    res.status(201).json({ message: 'Demo saved', demo });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.get('/api/demo-requests', adminAuth, async (req, res) => {
-  try {
-    const demos = await DemoRequest.find().sort({ createdAt: -1 });
-    res.json(demos);
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.patch('/api/demo-requests/:id', adminAuth, async (req, res) => {
-  try {
-    const demo = await DemoRequest.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
-    res.json({ demo });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.post('/api/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const masterEmail = process.env.SUPER_ADMIN_EMAIL || 'aadityarohilla668@gmail.com';
-    const masterPass = process.env.SUPER_ADMIN_PASSWORD || 'admin123';
-
-    if (email === masterEmail && password === masterPass) {
-      const token = jwt.sign(
-        { role: 'SuperAdmin', id: 'master_admin' }, 
-        process.env.JWT_SECRET || 'secret', 
-        { expiresIn: '1d' }
-      );
-      return res.status(200).json({ token, role: 'SuperAdmin' });
-    }
-
-    const dbAdmin = await Restaurant.findOne({ email: email.toLowerCase().trim(), role: 'SuperAdmin' });
-    if (dbAdmin) {
-      const bcrypt = require('bcryptjs');
-      const isMatch = await bcrypt.compare(password, dbAdmin.password);
-      if (isMatch) {
-        const token = jwt.sign(
-          { role: 'SuperAdmin', id: dbAdmin._id },
-          process.env.JWT_SECRET || 'secret',
-          { expiresIn: '1d' }
-        );
-        return res.status(200).json({ token, role: 'SuperAdmin' });
-      }
-    }
-    res.status(401).json({ message: 'Invalid Super Admin credentials' });
-  } catch (error) {
-    res.status(500).json({ message: 'Login failed', error: error.message });
-  }
-});
-
-app.get('/api/restaurants', adminAuth, async (req, res) => {
-  try {
-    const merchants = await Restaurant.find({ isVerified: true, role: 'Merchant' }, '-password').sort({ createdAt: -1 });
-    res.json(merchants);
-  } catch (err) { res.status(500).json({ message: 'Failed to fetch merchants', error: err.message }); }
-});
-
-app.patch('/api/restaurant-status', adminAuth, async (req, res) => {
-  try {
-    const { restaurantId, status } = req.body;
-    if (!['Approved', 'Rejected'].includes(status)) return res.status(400).json({ message: 'Invalid status' });
-    const restaurant = await Restaurant.findByIdAndUpdate(restaurantId, { status }, { new: true });
-    if (!restaurant) return res.status(404).json({ message: 'Merchant not found' });
-    res.json({ message: `Merchant application ${status.toLowerCase()} successfully`, restaurant });
-  } catch (err) { res.status(500).json({ message: 'Update failed', error: err.message }); }
-});
+// (Moved to superAdminRoutes/Controller)
 
 // Connect to MongoDB Atlas
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/pizzatown')

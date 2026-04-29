@@ -36,12 +36,25 @@ const restaurantSchema = new mongoose.Schema({
   subscriptionStartDate: { type: Date },
   subscriptionEndDate: { type: Date },
   
-  // Legacy fields (optional cleanup later)
-  isVerified: { type: Boolean, default: false },
-  otp: { type: String },
-  otpExpiry: { type: Date }
-  
-}, { timestamps: true });
+  // Registration Tracking
+  loginMethod: { type: String, enum: ['email', 'phone', 'google'], default: 'email' },
+  registrationIP: { type: String },
+  registrationDevice: { type: String },
+    
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
+
+// Virtual for restaurantId (alias for _id)
+restaurantSchema.virtual('restaurantId').get(function() {
+  return this._id.toHexString();
+});
+
+// Legacy Field Support (Aliases)
+restaurantSchema.virtual('trialEndsAt').get(function() { return this.trialEndDate; }).set(function(v) { this.trialEndDate = v; });
+restaurantSchema.virtual('subscriptionEndsAt').get(function() { return this.subscriptionEndDate; }).set(function(v) { this.subscriptionEndDate = v; });
 
 restaurantSchema.pre('save', async function() {
   if (!this.isModified('password')) return;

@@ -1,27 +1,67 @@
 const Restaurant = require('../models/Restaurant');
 const Order = require('../models/Order');
 const PlatformConfig = require('../models/PlatformConfig');
+const Log = require('../models/Log');
+const DemoRequest = require('../models/DemoRequest');
+const Product = require('../models/Product');
+const Customer = require('../models/Customer');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const masterEmail = process.env.SUPER_ADMIN_EMAIL || 'aadityarohilla668@gmail.com';
+    const masterPass = process.env.SUPER_ADMIN_PASSWORD || 'admin123';
+
+    if (email === masterEmail && password === masterPass) {
+      const token = jwt.sign(
+        { role: 'SuperAdmin', id: 'master_admin' }, 
+        process.env.JWT_SECRET || 'secret', 
+        { expiresIn: '1d' }
+      );
+      return res.status(200).json({ token, role: 'SuperAdmin' });
+    }
+
+    const dbAdmin = await Restaurant.findOne({ email: email.toLowerCase().trim(), role: 'SuperAdmin' });
+    if (dbAdmin) {
+      const isMatch = await bcrypt.compare(password, dbAdmin.password);
+      if (isMatch) {
+        const token = jwt.sign(
+          { role: 'SuperAdmin', id: dbAdmin._id },
+          process.env.JWT_SECRET || 'secret',
+          { expiresIn: '1d' }
+        );
+        return res.status(200).json({ token, role: 'SuperAdmin' });
+      }
+    }
+    res.status(401).json({ message: 'Invalid Super Admin credentials' });
+  } catch (error) {
+    res.status(500).json({ message: 'Login failed', error: error.message });
+  }
+};
 
 exports.getGlobalStats = async (req, res) => {
   try {
     const totalMerchants = await Restaurant.countDocuments({ role: 'Merchant' });
     const activeMerchants = await Restaurant.countDocuments({ role: 'Merchant', isActive: true });
+    const pendingMerchants = await Restaurant.countDocuments({ role: 'Merchant', status: 'Pending' });
     
     const allOrders = await Order.find();
     const totalRevenue = allOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
     const totalOrdersCount = allOrders.length;
 
-    const merchants = await Restaurant.find(
-      { role: 'Merchant' }, 
-      'restaurantName ownerName email status isActive plan trialStartDate trialEndDate subscriptionStartDate subscriptionEndDate createdAt'
-    ).sort({ createdAt: -1 });
-
+    // Growth data (last 7 days)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentOrders = await Order.find({ createdAt: { $gte: sevenDaysAgo } });
+    
     const stats = {
       totalMerchants,
       activeMerchants,
+      pendingMerchants,
       totalRevenue,
       totalOrdersCount,
-      merchants
+      revenueHistory: recentOrders.map(o => ({ date: o.createdAt, amount: o.totalAmount }))
     };
 
     res.status(200).json(stats);
@@ -30,14 +70,32 @@ exports.getGlobalStats = async (req, res) => {
   }
 };
 
+exports.getAllMerchants = async (req, res) => {
+  try {
+    const { search } = req.query;
+    let query = { role: 'Merchant' };
+    
+    if (search) {
+      query.$or = [
+        { restaurantName: { $regex: search, $options: 'i' } },
+        { ownerName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const merchants = await Restaurant.find(query, '-password').sort({ createdAt: -1 });
+    res.status(200).json(merchants);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch merchants', error: error.message });
+  }
+};
+
 exports.updatePlatformConfig = async (req, res) => {
   try {
     const { monthlyPrice, yearlyPrice, freeTrialDays, email, phone, whatsapp } = req.body;
-    
     let config = await PlatformConfig.findOne();
-    if (!config) {
-      config = new PlatformConfig();
-    }
+    if (!config) config = new PlatformConfig();
 
     if (monthlyPrice !== undefined) config.monthlyPrice = monthlyPrice;
     if (yearlyPrice !== undefined) config.yearlyPrice = yearlyPrice;
@@ -59,7 +117,6 @@ exports.toggleMerchantStatus = async (req, res) => {
     const restaurant = await Restaurant.findById(id);
     if (!restaurant) return res.status(404).json({ message: 'Merchant not found' });
     
-    // Toggle the Active state
     restaurant.isActive = !restaurant.isActive;
     await restaurant.save();
 
@@ -72,48 +129,26 @@ exports.toggleMerchantStatus = async (req, res) => {
 exports.getMerchantDetails = async (req, res) => {
   try {
     const { id } = req.params;
-    
     const restaurant = await Restaurant.findById(id, '-password');
     if (!restaurant) return res.status(404).json({ message: 'Merchant not found' });
 
-    // Fetch the detailed stats for this specific merchant
     const orders = await Order.find({ restaurantId: id }).sort({ createdAt: -1 });
-    const Product = require('../models/Product');
     const products = await Product.find({ restaurantId: id }).sort({ createdAt: -1 });
-    const productsCount = products.length;
+    const customers = await Customer.find({ restaurantId: id }).sort({ createdAt: -1 });
 
     const totalRevenue = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
-
-    const now = new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    
-    let currentMonthRevenue = 0;
-    let previousMonthRevenue = 0;
-    let currentMonthOrders = 0;
-
-    orders.forEach(o => {
-      const d = new Date(o.createdAt);
-      if (d >= currentMonthStart) {
-        currentMonthRevenue += (o.totalAmount || 0);
-        currentMonthOrders++;
-      } else if (d >= previousMonthStart && d < currentMonthStart) {
-        previousMonthRevenue += (o.totalAmount || 0);
-      }
-    });
 
     res.status(200).json({
       restaurant,
       stats: {
         totalOrders: orders.length,
         totalRevenue,
-        currentMonthRevenue,
-        previousMonthRevenue,
-        currentMonthOrders,
-        productsCount
+        productsCount: products.length,
+        customersCount: customers.length
       },
-      recentOrders: orders.slice(0, 150),
-      products: products.slice(0, 100)
+      orders: orders.slice(0, 50),
+      products: products.slice(0, 50),
+      customers: customers.slice(0, 50)
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch details', error: error.message });
@@ -123,7 +158,7 @@ exports.getMerchantDetails = async (req, res) => {
 exports.updateMerchantStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body; // 'Pending', 'Approved', 'Rejected'
+    const { status } = req.body;
     const restaurant = await Restaurant.findByIdAndUpdate(id, { status }, { new: true });
     res.status(200).json({ message: `Status updated to ${status}`, restaurant });
   } catch (error) {
@@ -134,35 +169,90 @@ exports.updateMerchantStatus = async (req, res) => {
 exports.updateMerchantSubscription = async (req, res) => {
   try {
     const { id } = req.params;
-    const { trialEndDate, subscriptionEndDate, plan, isActive } = req.body;
+    const { subscriptionStartDate, subscriptionEndDate, plan, isActive } = req.body;
     
     const restaurant = await Restaurant.findById(id);
     if (!restaurant) return res.status(404).json({ message: 'Merchant not found' });
 
-    if (trialEndDate !== undefined) {
-      restaurant.trialEndDate = trialEndDate;
-      restaurant.trialEndsAt = trialEndDate; // Backward compatibility
-    }
-    if (subscriptionEndDate !== undefined) {
-      restaurant.subscriptionEndDate = subscriptionEndDate;
-      restaurant.subscriptionEndsAt = subscriptionEndDate; // Backward compatibility
-    }
+    if (subscriptionStartDate !== undefined) restaurant.subscriptionStartDate = subscriptionStartDate;
+    if (subscriptionEndDate !== undefined) restaurant.subscriptionEndDate = subscriptionEndDate;
     if (plan !== undefined) restaurant.plan = plan;
     if (isActive !== undefined) restaurant.isActive = isActive;
 
     await restaurant.save();
-    res.status(200).json({ 
-      message: 'Merchant subscription updated successfully!', 
-      restaurant: {
-        id: restaurant._id,
-        restaurantName: restaurant.restaurantName,
-        trialEndDate: restaurant.trialEndDate,
-        subscriptionEndDate: restaurant.subscriptionEndDate,
-        plan: restaurant.plan,
-        isActive: restaurant.isActive
-      }
-    });
+    res.status(200).json({ message: 'Subscription updated', restaurant });
   } catch (error) {
     res.status(500).json({ message: 'Failed to update subscription', error: error.message });
+  }
+};
+
+exports.impersonateMerchant = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const restaurant = await Restaurant.findById(id);
+    if (!restaurant) return res.status(404).json({ message: 'Merchant not found' });
+
+    const token = jwt.sign(
+      { 
+        id: restaurant._id, 
+        role: restaurant.role, 
+        status: restaurant.status,
+        plan: restaurant.plan,
+        impersonated: true
+      }, 
+      process.env.JWT_SECRET || 'secret', 
+      { expiresIn: '2h' }
+    );
+
+    res.status(200).json({ token, restaurant });
+  } catch (error) {
+    res.status(500).json({ message: 'Impersonation failed', error: error.message });
+  }
+};
+
+exports.createDemoRequest = async (req, res) => {
+  try {
+    const { name, phone, restaurant, city, outletType } = req.body;
+    const demo = await DemoRequest.create({ name, phone, restaurant, city, outletType });
+    res.status(201).json({ message: 'Demo request received', demo });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getAllDemoRequests = async (req, res) => {
+  try {
+    const demos = await DemoRequest.find().sort({ createdAt: -1 });
+    res.status(200).json(demos);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateDemoRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const demo = await DemoRequest.findByIdAndUpdate(id, { status: req.body.status }, { new: true });
+    res.status(200).json(demo);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getLogs = async (req, res) => {
+  try {
+    const logs = await Log.find({ type: 'activity' }).sort({ createdAt: -1 }).limit(100).populate('restaurantId', 'restaurantName');
+    res.status(200).json(logs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getErrorLogs = async (req, res) => {
+  try {
+    const logs = await Log.find({ type: 'error' }).sort({ createdAt: -1 }).limit(100).populate('restaurantId', 'restaurantName');
+    res.status(200).json(logs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
