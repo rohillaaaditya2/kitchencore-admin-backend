@@ -14,6 +14,9 @@ const restaurantSchema = new mongoose.Schema({
     enum: ['Pending', 'Approved', 'Rejected'], 
     default: 'Pending' 
   },
+  isVerified: { type: Boolean, default: false },
+  otp: { type: String },
+  otpExpiry: { type: Date },
   
   // SaaS Role
   role: { 

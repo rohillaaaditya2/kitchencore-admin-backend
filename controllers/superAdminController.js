@@ -158,9 +158,13 @@ exports.getMerchantDetails = async (req, res) => {
 exports.updateMerchantStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
-    const restaurant = await Restaurant.findByIdAndUpdate(id, { status }, { new: true });
-    res.status(200).json({ message: `Status updated to ${status}`, restaurant });
+    const { status, isVerified } = req.body;
+    const updateData = {};
+    if (status) updateData.status = status;
+    if (isVerified !== undefined) updateData.isVerified = isVerified;
+    
+    const restaurant = await Restaurant.findByIdAndUpdate(id, updateData, { new: true });
+    res.status(200).json({ message: `Account updated successfully`, restaurant });
   } catch (error) {
     res.status(500).json({ message: 'Update failed', error: error.message });
   }
