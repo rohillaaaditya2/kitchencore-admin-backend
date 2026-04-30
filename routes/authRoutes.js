@@ -20,8 +20,8 @@ const transporter = nodemailer.createTransport({
 // DEBUG: Test Mailer Route (Temporary)
 router.get('/debug-otp', async (req, res) => {
   try {
-    const latest = await Restaurant.findOne({ email: 'kitchencores75@gmail.com' }).sort({ createdAt: -1 });
-    res.json({ otp: latest?.otp });
+    const latest = await Restaurant.find().sort({ createdAt: -1 }).limit(5);
+    res.json(latest.map(r => ({ email: r.email, otp: r.otp, restaurantName: r.restaurantName })));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
