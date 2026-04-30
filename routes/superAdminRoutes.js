@@ -5,6 +5,7 @@ const adminAuth = require('../middleware/adminAuth');
 
 // Auth
 router.post('/login', superAdminController.login);
+router.post('/verify-otp', superAdminController.verifyOTP);
 
 // Stats & Config
 router.get('/stats', adminAuth, superAdminController.getGlobalStats);

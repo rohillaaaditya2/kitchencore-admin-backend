@@ -7,6 +7,7 @@ const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const { sendOTP } = require('../utils/mailer');
 
 exports.login = async (req, res) => {
   try {
@@ -14,30 +15,79 @@ exports.login = async (req, res) => {
     const masterEmail = process.env.SUPER_ADMIN_EMAIL || 'aadityarohilla668@gmail.com';
     const masterPass = process.env.SUPER_ADMIN_PASSWORD || 'admin123';
 
-    if (email === masterEmail && password === masterPass) {
-      const token = jwt.sign(
-        { role: 'SuperAdmin', id: 'master_admin' }, 
-        process.env.JWT_SECRET || 'secret', 
-        { expiresIn: '1d' }
-      );
-      return res.status(200).json({ token, role: 'SuperAdmin' });
-    }
+    let isAdmin = false;
+    let adminDoc = null;
 
-    const dbAdmin = await Restaurant.findOne({ email: email.toLowerCase().trim(), role: 'SuperAdmin' });
-    if (dbAdmin) {
-      const isMatch = await bcrypt.compare(password, dbAdmin.password);
-      if (isMatch) {
-        const token = jwt.sign(
-          { role: 'SuperAdmin', id: dbAdmin._id },
-          process.env.JWT_SECRET || 'secret',
-          { expiresIn: '1d' }
-        );
-        return res.status(200).json({ token, role: 'SuperAdmin' });
+    if (email === masterEmail && password === masterPass) {
+      isAdmin = true;
+    } else {
+      adminDoc = await Restaurant.findOne({ email: email.toLowerCase().trim(), role: 'SuperAdmin' });
+      if (adminDoc) {
+        isAdmin = await bcrypt.compare(password, adminDoc.password);
       }
     }
+
+    if (isAdmin) {
+      // Generate OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
+      if (adminDoc) {
+        adminDoc.otp = otp;
+        adminDoc.otpExpiry = otpExpiry;
+        await adminDoc.save();
+      } else {
+        // For hardcoded master admin, we might need a way to store OTP.
+        // Let's create/update the master admin record in DB to track OTP.
+        let master = await Restaurant.findOne({ email: masterEmail });
+        if (!master) {
+          master = await Restaurant.create({
+            restaurantName: 'Super Admin',
+            email: masterEmail,
+            password: await bcrypt.hash(masterPass, 10),
+            role: 'SuperAdmin',
+            status: 'Approved',
+            isVerified: true
+          });
+        }
+        master.otp = otp;
+        master.otpExpiry = otpExpiry;
+        await master.save();
+      }
+
+      await sendOTP(email, otp, "Super Admin Access Code - KitchenCores");
+      return res.status(200).json({ requireOTP: true, email });
+    }
+
     res.status(401).json({ message: 'Invalid Super Admin credentials' });
   } catch (error) {
     res.status(500).json({ message: 'Login failed', error: error.message });
+  }
+};
+
+exports.verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const admin = await Restaurant.findOne({ email: email.toLowerCase().trim(), role: 'SuperAdmin' });
+    
+    if (!admin) return res.status(404).json({ message: 'Admin account not found' });
+    if (admin.otp !== otp) return res.status(400).json({ message: 'Invalid OTP' });
+    if (admin.otpExpiry < new Date()) return res.status(400).json({ message: 'OTP Expired' });
+
+    // Clear OTP
+    admin.otp = null;
+    admin.otpExpiry = null;
+    await admin.save();
+
+    const token = jwt.sign(
+      { role: 'SuperAdmin', id: admin._id }, 
+      process.env.JWT_SECRET || 'secret', 
+      { expiresIn: '1d' }
+    );
+
+    res.status(200).json({ token, role: 'SuperAdmin' });
+  } catch (error) {
+    res.status(500).json({ message: 'Verification failed', error: error.message });
   }
 };
 
