@@ -93,24 +93,16 @@ router.post('/signup', async (req, res) => {
       registrationDevice: req.get('user-agent')
     });
 
-    // Send response first, then try to send email in background if needed
-    // Or at least handle it without blocking the whole response if it's slow
-    try {
-      await sendOTP(email, otp);
-      return res.status(201).json({ 
-        message: 'Account created! OTP sent to email.', 
-        email,
-        status: 'Pending'
-      });
-    } catch (mailError) {
-      console.error('Signup Mail Error:', mailError);
-      return res.status(201).json({ 
-        message: 'Account created, but we couldn\'t send the OTP. Please contact support.', 
-        email,
-        status: 'Pending'
-      });
-    }
+    // Send OTP in background so it doesn't block the response
+    sendOTP(email, otp).catch(err => console.error('Background Mail Error:', err));
+
+    return res.status(201).json({ 
+      message: 'Account created! Please check your email for the verification code.', 
+      email,
+      status: 'Pending'
+    });
   } catch (error) {
+    console.error('Signup Route Error:', error);
     res.status(500).json({ message: 'Signup failed', error: error.message });
   }
 });
