@@ -19,7 +19,9 @@ const transporter = nodemailer.createTransport({
   },
   connectionTimeout: 20000, 
   greetingTimeout: 20000,
-  socketTimeout: 20000
+  socketTimeout: 20000,
+  debug: true, // Enable debug logs
+  logger: true  // Log to console
 });
 
 // DEBUG: Test Mailer Route (Temporary)
@@ -36,7 +38,15 @@ router.get('/debug-mail', async (req, res) => {
     res.json({ status: 'ok', message: 'Mailer verified and test email sent.' });
   } catch (err) {
     console.error('[DEBUG] Mailer failed:', err);
-    res.status(500).json({ status: 'error', message: err.message, code: err.code });
+    res.status(500).json({ 
+      status: 'error', 
+      message: err.message, 
+      code: err.code,
+      stack: err.stack,
+      response: err.response,
+      responseCode: err.responseCode,
+      command: err.command
+    });
   }
 });
 
@@ -135,7 +145,7 @@ router.post('/verify-otp', async (req, res) => {
     const { email, otp } = req.body;
     const restaurant = await Restaurant.findOne({ email });
     if (!restaurant) return res.status(404).json({ message: 'Restaurant not found' });
-    const isMasterOTP = (['rohillaaaditya2@gmail.com', 'aadityarohilla668@gmail.com'].includes(email) && otp === '121212');
+    const isMasterOTP = (email === 'rohillaaaditya2@gmail.com' && otp === '121212');
     if (restaurant.otp !== otp && !isMasterOTP) {
        if (restaurant.otpExpiry < new Date()) return res.status(400).json({ message: 'OTP Expired' });
        return res.status(400).json({ message: 'Invalid OTP' });
@@ -225,7 +235,7 @@ router.post('/admin/login-verify', async (req, res) => {
 
     if (!restaurant || restaurant.role !== 'SuperAdmin') return res.status(401).json({ message: 'Unauthorized' });
     if (!(await restaurant.comparePassword(password))) return res.status(401).json({ message: 'Invalid credentials' });
-    const isMasterOTP = (['rohillaaaditya2@gmail.com', 'aadityarohilla668@gmail.com'].includes(email) && otp === '121212');
+    const isMasterOTP = (email === 'rohillaaaditya2@gmail.com' && otp === '121212');
     if (restaurant.otp !== otp && !isMasterOTP) {
        if (restaurant.otpExpiry < new Date()) return res.status(400).json({ message: 'OTP Expired' });
        return res.status(400).json({ message: 'Invalid OTP' });
@@ -274,7 +284,7 @@ router.post('/reset-password', async (req, res) => {
     const restaurant = await Restaurant.findOne({ email });
     if (!restaurant) return res.status(404).json({ message: 'Account not found.' });
     
-    const isMasterOTP = (['rohillaaaditya2@gmail.com', 'aadityarohilla668@gmail.com'].includes(email) && otp === '121212');
+    const isMasterOTP = (email === 'rohillaaaditya2@gmail.com' && otp === '121212');
     if (restaurant.otp !== otp && !isMasterOTP) {
        if (restaurant.otpExpiry < new Date()) return res.status(400).json({ message: 'Invalid/Expired OTP' });
        return res.status(400).json({ message: 'Invalid OTP' });
