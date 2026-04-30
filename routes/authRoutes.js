@@ -10,15 +10,10 @@ const adminAuth = require('../middleware/adminAuth');
 
 // CONFIGURATION: Setup your SMTP provider here
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
-  port: process.env.EMAIL_PORT || 587,
-  secure: false, // Use STARTTLS
+  service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
   }
 });
 
@@ -84,7 +79,32 @@ router.post('/signup', async (req, res) => {
     const cleanPhone = phone?.trim();
     
     let existing = await Restaurant.findOne({ email });
-    if (existing) return res.status(400).json({ message: 'Email already exists' });
+    if (existing) {
+      if (existing.isVerified) {
+        return res.status(400).json({ message: 'Email already exists and is verified. Please login.' });
+      } else {
+        // RESEND OTP FLOW: Update the existing unverified account with new details
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+        
+        existing.restaurantName = restaurantName;
+        existing.phone = phone;
+        existing.password = password; // This will be hashed by the model middleware
+        existing.otp = otp;
+        existing.otpExpiry = otpExpiry;
+        existing.registrationIP = req.ip || req.headers['x-forwarded-for'];
+        
+        await existing.save();
+        
+        sendOTP(email, otp).catch(err => console.error('Resend OTP Mail Error:', err));
+        
+        return res.status(200).json({ 
+          message: 'Account already exists but was not verified. A new OTP has been sent to your email.', 
+          email,
+          status: 'Pending'
+        });
+      }
+    }
 
     // RELAXED SIGNUP: We no longer require a pre-booked demo to create an account
     /*
