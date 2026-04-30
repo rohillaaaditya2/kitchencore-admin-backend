@@ -21,26 +21,29 @@ const transporter = nodemailer.createTransport({
 });
 
 // Helper to send OTP
-const sendOTP = async (email, otp) => {
-  console.log('--- DEVELOPMENT OTP ---');
-  console.log(`Email: ${email}`);
-  console.log(`OTP: ${otp}`);
-  console.log('------------------------');
-
-  await transporter.sendMail({
-    from: '"KitchCores" <noreply@kitchcores.com>',
-    to: email,
-    subject: "Email Verification - KitchCores Platform",
-    text: `Your OTP for verification is: ${otp}. It will expire in 10 minutes.`,
-    html: `<div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border-radius:16px;border:1px solid #f0f0f0">
-      <h2 style="color:#ea580c;margin-bottom:8px">KitchCores</h2>
-      <p style="color:#475569">Use the OTP below to verify your email address.</p>
-      <div style="background:#fff7ed;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
-        <span style="font-size:36px;font-weight:900;letter-spacing:12px;color:#1e293b">${otp}</span>
-      </div>
-      <p style="color:#94a3b8;font-size:12px">This OTP expires in <b>10 minutes</b>. Do not share it with anyone.</p>
-    </div>`
-  });
+const sendOTP = async (email, otp, subject = "Email Verification - KitchCores Platform") => {
+  console.log(`[OTP] Sending ${otp} to ${email}...`);
+  
+  try {
+    await transporter.sendMail({
+      from: `"KitchenCores" <${process.env.EMAIL_USER}>`, // Use authenticated user
+      to: email,
+      subject: subject,
+      text: `Your OTP is: ${otp}. It will expire in 10 minutes.`,
+      html: `<div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border-radius:16px;border:1px solid #f0f0f0">
+        <h2 style="color:#ea580c;margin-bottom:8px">KitchenCores</h2>
+        <p style="color:#475569">Use the OTP below for verification.</p>
+        <div style="background:#fff7ed;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
+          <span style="font-size:36px;font-weight:900;letter-spacing:12px;color:#1e293b">${otp}</span>
+        </div>
+        <p style="color:#94a3b8;font-size:12px">This OTP expires in <b>10 minutes</b>. If you didn't request this, please ignore.</p>
+      </div>`
+    });
+    console.log(`[OTP] Sent successfully to ${email}`);
+  } catch (error) {
+    console.error(`[OTP] Failed to send to ${email}:`, error.message);
+    throw error; // Let the caller decide how to handle failure
+  }
 };
 
 router.post('/signup', async (req, res) => {
@@ -228,15 +231,12 @@ router.post('/forgot-password', async (req, res) => {
     restaurant.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     await restaurant.save();
 
-    try {
-      await transporter.sendMail({
-        from: '"KitchCores" <noreply@kitchcores.com>',
-        to: email,
-        subject: 'Password Reset OTP',
-        html: `<h2>OTP: ${otp}</h2>`
-      });
-    } catch(mailErr) {}
-    res.json({ message: 'OTP sent.' });
+    // Use the helper for consistency and background execution
+    sendOTP(email, otp, 'Password Reset OTP - KitchenCores').catch(err => {
+      console.error('Forgot Pass Background Mail Error:', err);
+    });
+
+    res.json({ message: 'OTP sent. Please check your inbox (and spam folder).' });
   } catch (err) {
     res.status(500).json({ message: 'Failed.', error: err.message });
   }
