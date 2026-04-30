@@ -10,38 +10,11 @@ const adminAuth = require('../middleware/adminAuth');
 
 // CONFIGURATION: Setup your SMTP provider here (BREVO)
 const transporter = nodemailer.createTransport({
-  host: 'smtp-relay.brevo.com',
-  port: 587,
+  host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
+  port: process.env.EMAIL_PORT || 587,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
-  }
-});
-
-// DEBUG: Detailed Email Status
-router.get('/test-email-status', async (req, res) => {
-  try {
-    await transporter.verify();
-    res.json({ 
-      status: 'success', 
-      message: 'Transporter is connected',
-      user: process.env.EMAIL_USER ? 'Present' : 'Missing',
-      pass: process.env.EMAIL_PASS ? 'Present' : 'Missing'
-    });
-  } catch (err) {
-    res.status(500).json({ 
-      status: 'error', 
-      message: err.message,
-      code: err.code,
-      command: err.command,
-      response: err.response,
-      stack: err.stack
-    });
-  }
-});
-
-      command: err.command
-    });
   }
 });
 
