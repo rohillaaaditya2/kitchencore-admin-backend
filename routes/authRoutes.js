@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-      command: err.command
+command: err.command
     });
   }
 });
@@ -26,10 +26,10 @@ const transporter = nodemailer.createTransport({
 // Helper to send OTP
 const sendOTP = async (email, otp, subject = "Email Verification - KitchCores Platform") => {
   console.log(`[OTP] Sending ${otp} to ${email}...`);
-  
+
   try {
     await transporter.sendMail({
-      from: `"KitchenCores" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`, 
+      from: `"KitchenCores" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
       to: email,
       subject: subject,
       text: `Your OTP is: ${otp}. It will expire in 10 minutes.`,
@@ -57,7 +57,7 @@ router.post('/signup', async (req, res) => {
     const cleanRestaurantName = restaurantName?.trim();
     if (!phone) return res.status(400).json({ message: 'Phone number is required' });
     const cleanPhone = phone?.trim();
-    
+
     let existing = await Restaurant.findOne({ email });
     if (existing) {
       if (existing.isVerified) {
@@ -66,20 +66,20 @@ router.post('/signup', async (req, res) => {
         // RESEND OTP FLOW: Update the existing unverified account with new details
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-        
+
         existing.restaurantName = restaurantName;
         existing.phone = phone;
         existing.password = password; // This will be hashed by the model middleware
         existing.otp = otp;
         existing.otpExpiry = otpExpiry;
         existing.registrationIP = req.ip || req.headers['x-forwarded-for'];
-        
+
         await existing.save();
-        
+
         sendOTP(email, otp).catch(err => console.error('Resend OTP Mail Error:', err));
-        
-        return res.status(200).json({ 
-          message: 'Account already exists but was not verified. A new OTP has been sent to your email.', 
+
+        return res.status(200).json({
+          message: 'Account already exists but was not verified. A new OTP has been sent to your email.',
           email,
           status: 'Pending'
         });
@@ -127,8 +127,8 @@ router.post('/signup', async (req, res) => {
     // Send OTP in background so it doesn't block the response
     sendOTP(email, otp).catch(err => console.error('Background Mail Error:', err));
 
-    return res.status(201).json({ 
-      message: 'Account created! Please check your email for the verification code.', 
+    return res.status(201).json({
+      message: 'Account created! Please check your email for the verification code.',
       email,
       status: 'Pending'
     });
@@ -158,68 +158,68 @@ router.post('/verify-otp', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-    try {
-      const { email: rawEmail, password } = req.body;
-      const email = rawEmail.toLowerCase().trim();
-      const restaurant = await Restaurant.findOne({ email });
-  
-      if (!restaurant) return res.status(401).json({ message: 'Invalid credentials' });
-      if (!(await restaurant.comparePassword(password))) return res.status(401).json({ message: 'Invalid credentials' });
-  
-      if (!restaurant.isActive) return res.status(403).json({ message: 'Account inactive. Contact support.' });
-      if (!restaurant.isVerified) return res.status(401).json({ message: 'Account not verified.' });
+  try {
+    const { email: rawEmail, password } = req.body;
+    const email = rawEmail.toLowerCase().trim();
+    const restaurant = await Restaurant.findOne({ email });
 
-      if (restaurant.role !== 'SuperAdmin') {
-        if (restaurant.status === 'Pending') return res.status(403).json({ message: 'Under review.' });
-        if (restaurant.status === 'Rejected') return res.status(403).json({ message: 'Rejected.' });
-      }
+    if (!restaurant) return res.status(401).json({ message: 'Invalid credentials' });
+    if (!(await restaurant.comparePassword(password))) return res.status(401).json({ message: 'Invalid credentials' });
 
-      if (restaurant.role === 'SuperAdmin') {
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        restaurant.otp = otp;
-        restaurant.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-        await restaurant.save();
-        try {
-          await sendOTP(email, otp);
-          return res.status(200).json({ requireOTP: true, email });
-        } catch (mailErr) {
-          return res.status(200).json({ requireOTP: true, email, message: 'OTP sent, but email failed.' });
-        }
-      }
-  
-      // Subscription / Trial Expiry Check
-      if (restaurant.role !== 'SuperAdmin') {
-        const now = new Date();
-        const trialDate = restaurant.trialEndDate || restaurant.trialEndsAt;
-        const subDate = restaurant.subscriptionEndDate || restaurant.subscriptionEndsAt;
+    if (!restaurant.isActive) return res.status(403).json({ message: 'Account inactive. Contact support.' });
+    if (!restaurant.isVerified) return res.status(401).json({ message: 'Account not verified.' });
 
-        const trialActive = trialDate && new Date(trialDate) > now;
-        const subActive = subDate && new Date(subDate) > now;
-
-        if (!trialActive && !subActive) {
-          return res.status(403).json({ 
-            message: 'Your subscription has expired. Access denied.', 
-            isExpired: true,
-            trialEndDate: trialDate,
-            subscriptionEndDate: subDate
-          });
-        }
-      }
-  
-      const token = jwt.sign(
-        { 
-          id: restaurant._id, 
-          role: restaurant.role, 
-          status: restaurant.status,
-          plan: restaurant.plan
-        }, 
-        process.env.JWT_SECRET || 'secret', 
-        { expiresIn: '1d' }
-      );
-      res.status(200).json({ token, restaurant });
-    } catch (error) {
-      res.status(500).json({ message: 'Login failed', error: error.message });
+    if (restaurant.role !== 'SuperAdmin') {
+      if (restaurant.status === 'Pending') return res.status(403).json({ message: 'Under review.' });
+      if (restaurant.status === 'Rejected') return res.status(403).json({ message: 'Rejected.' });
     }
+
+    if (restaurant.role === 'SuperAdmin') {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      restaurant.otp = otp;
+      restaurant.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+      await restaurant.save();
+      try {
+        await sendOTP(email, otp);
+        return res.status(200).json({ requireOTP: true, email });
+      } catch (mailErr) {
+        return res.status(200).json({ requireOTP: true, email, message: 'OTP sent, but email failed.' });
+      }
+    }
+
+    // Subscription / Trial Expiry Check
+    if (restaurant.role !== 'SuperAdmin') {
+      const now = new Date();
+      const trialDate = restaurant.trialEndDate || restaurant.trialEndsAt;
+      const subDate = restaurant.subscriptionEndDate || restaurant.subscriptionEndsAt;
+
+      const trialActive = trialDate && new Date(trialDate) > now;
+      const subActive = subDate && new Date(subDate) > now;
+
+      if (!trialActive && !subActive) {
+        return res.status(403).json({
+          message: 'Your subscription has expired. Access denied.',
+          isExpired: true,
+          trialEndDate: trialDate,
+          subscriptionEndDate: subDate
+        });
+      }
+    }
+
+    const token = jwt.sign(
+      {
+        id: restaurant._id,
+        role: restaurant.role,
+        status: restaurant.status,
+        plan: restaurant.plan
+      },
+      process.env.JWT_SECRET || 'secret',
+      { expiresIn: '1d' }
+    );
+    res.status(200).json({ token, restaurant });
+  } catch (error) {
+    res.status(500).json({ message: 'Login failed', error: error.message });
+  }
 });
 
 router.post('/admin/login-verify', async (req, res) => {
@@ -238,8 +238,8 @@ router.post('/admin/login-verify', async (req, res) => {
     await restaurant.save();
 
     const token = jwt.sign(
-      { id: restaurant._id, role: restaurant.role, status: restaurant.status }, 
-      process.env.JWT_SECRET || 'secret', 
+      { id: restaurant._id, role: restaurant.role, status: restaurant.status },
+      process.env.JWT_SECRET || 'secret',
       { expiresIn: '1d' }
     );
     res.status(200).json({ token, restaurant });
@@ -275,7 +275,7 @@ router.post('/reset-password', async (req, res) => {
     const { email, otp, newPassword } = req.body;
     const restaurant = await Restaurant.findOne({ email });
     if (!restaurant) return res.status(404).json({ message: 'Account not found.' });
-    
+
     if (restaurant.otp !== otp || restaurant.otpExpiry < new Date()) return res.status(400).json({ message: 'Invalid/Expired OTP' });
 
     restaurant.password = newPassword;
