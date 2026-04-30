@@ -272,12 +272,7 @@ router.post('/reset-password', async (req, res) => {
     const restaurant = await Restaurant.findOne({ email });
     if (!restaurant) return res.status(404).json({ message: 'Account not found.' });
     
-    console.log(`[RESET] Email: ${email}, Input OTP: ${otp}, DB OTP: ${restaurant.otp}`);
-    
-    const isMasterOTP = otp === '998877';
-    const isTestEmail = email === 'kitchencores75@gmail.com';
-    
-    if (!isMasterOTP && !isTestEmail && (String(restaurant.otp) !== String(otp) || restaurant.otpExpiry < new Date())) {
+    if (String(restaurant.otp) !== String(otp) || restaurant.otpExpiry < new Date()) {
       return res.status(400).json({ message: 'Invalid/Expired OTP' });
     }
 
