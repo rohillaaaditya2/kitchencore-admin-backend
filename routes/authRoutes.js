@@ -18,6 +18,13 @@ const transporter = nodemailer.createTransport({
 });
 
 // DEBUG: Test Mailer Route (Temporary)
+router.get('/debug-otp', async (req, res) => {
+  try {
+    const latest = await Restaurant.findOne({ email: 'kitchencores75@gmail.com' }).sort({ createdAt: -1 });
+    res.json({ otp: latest?.otp });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.get('/debug-mail', async (req, res) => {
   console.log('[DEBUG] Testing mailer from production...');
   try {
