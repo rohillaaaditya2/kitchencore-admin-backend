@@ -1,16 +1,19 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
-  port: parseInt(process.env.EMAIL_PORT) || 587,
-  secure: parseInt(process.env.EMAIL_PORT) === 465, // true for 465, false for other ports
+  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.EMAIL_PORT) || 465,
+  secure: parseInt(process.env.EMAIL_PORT) === 465,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS || process.env.FMAL_PASS
   },
   tls: {
-    rejectUnauthorized: false // Helps with some cloud hosting certificate issues
-  }
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 10000,
+  socketTimeout: 15000
 });
 
 const sendOTP = async (email, otp, subject = "Verification Code - KitchenCores") => {
