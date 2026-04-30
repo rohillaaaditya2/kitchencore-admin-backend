@@ -10,21 +10,16 @@ const adminAuth = require('../middleware/adminAuth');
 
 // CONFIGURATION: Setup your SMTP provider here
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
+  host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
+  port: process.env.EMAIL_PORT || 587,
   secure: false, // Use STARTTLS
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   },
   tls: {
-    rejectUnauthorized: false // Helps with some cloud certificate issues
-  },
-  connectionTimeout: 20000, 
-  greetingTimeout: 20000,
-  socketTimeout: 20000,
-  debug: true,
-  logger: true
+    rejectUnauthorized: false
+  }
 });
 
 // DEBUG: Test Mailer Route (Temporary)
@@ -59,7 +54,7 @@ const sendOTP = async (email, otp, subject = "Email Verification - KitchCores Pl
   
   try {
     await transporter.sendMail({
-      from: `"KitchenCores" <${process.env.EMAIL_USER}>`, // Use authenticated user
+      from: `"KitchenCores" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`, 
       to: email,
       subject: subject,
       text: `Your OTP is: ${otp}. It will expire in 10 minutes.`,
