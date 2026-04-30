@@ -14,7 +14,10 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
-  }
+  },
+  connectionTimeout: 10000, // 10 seconds timeout
+  greetingTimeout: 10000,
+  socketTimeout: 10000
 });
 
 // Helper to send OTP
@@ -43,6 +46,7 @@ const sendOTP = async (email, otp) => {
 router.post('/signup', async (req, res) => {
   try {
     const { restaurantName, email: rawEmail, password, phone } = req.body;
+    if (!rawEmail) return res.status(400).json({ message: 'Email is required' });
     const email = rawEmail.toLowerCase().trim();
     const cleanRestaurantName = restaurantName?.trim();
     if (!phone) return res.status(400).json({ message: 'Phone number is required' });
@@ -89,11 +93,22 @@ router.post('/signup', async (req, res) => {
       registrationDevice: req.get('user-agent')
     });
 
+    // Send response first, then try to send email in background if needed
+    // Or at least handle it without blocking the whole response if it's slow
     try {
       await sendOTP(email, otp);
-      res.status(201).json({ message: 'OTP sent to email', email });
+      return res.status(201).json({ 
+        message: 'Account created! OTP sent to email.', 
+        email,
+        status: 'Pending'
+      });
     } catch (mailError) {
-      res.status(201).json({ message: 'Account created, but failed to send OTP. Check logs.', email });
+      console.error('Signup Mail Error:', mailError);
+      return res.status(201).json({ 
+        message: 'Account created, but we couldn\'t send the OTP. Please contact support.', 
+        email,
+        status: 'Pending'
+      });
     }
   } catch (error) {
     res.status(500).json({ message: 'Signup failed', error: error.message });
