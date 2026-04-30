@@ -267,7 +267,8 @@ router.post('/forgot-password', async (req, res) => {
 
 router.post('/reset-password', async (req, res) => {
   try {
-    const { email, otp, newPassword } = req.body;
+    const { email: rawEmail, otp, newPassword } = req.body;
+    const email = rawEmail?.toLowerCase().trim();
     const restaurant = await Restaurant.findOne({ email });
     if (!restaurant) return res.status(404).json({ message: 'Account not found.' });
     
