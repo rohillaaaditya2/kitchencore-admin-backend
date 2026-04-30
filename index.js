@@ -173,7 +173,7 @@ function startInventoryStockBlocker() {
   }, 5 * 60 * 1000); // 5 minutes
 }
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || process.env.PORI || 5000;
 const http = require('http');
 const server = http.createServer(app);
 const socketIO = require('./socket');
