@@ -20,6 +20,24 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 10000
 });
 
+// DEBUG: Test Mailer Route (Temporary)
+router.get('/debug-mail', async (req, res) => {
+  console.log('[DEBUG] Testing mailer from production...');
+  try {
+    await transporter.verify();
+    await transporter.sendMail({
+      from: `"KitchenCores Debug" <${process.env.EMAIL_USER}>`,
+      to: process.env.EMAIL_USER,
+      subject: "Production Mailer Test",
+      text: "If you see this, SMTP is working on production."
+    });
+    res.json({ status: 'ok', message: 'Mailer verified and test email sent.' });
+  } catch (err) {
+    console.error('[DEBUG] Mailer failed:', err);
+    res.status(500).json({ status: 'error', message: err.message, code: err.code });
+  }
+});
+
 // Helper to send OTP
 const sendOTP = async (email, otp, subject = "Email Verification - KitchCores Platform") => {
   console.log(`[OTP] Sending ${otp} to ${email}...`);
