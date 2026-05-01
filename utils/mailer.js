@@ -1,13 +1,14 @@
 const axios = require('axios');
 
 const sendOTP = async (email, otp, subject = "Verification Code - KitchenCores") => {
-  console.log(`[OTP] Sending ${otp} to ${email} via Brevo API...`);
-  
   const apiKey = process.env.EMAIL_PASS || process.env.FMAL_PASS;
+  const keyLength = apiKey ? apiKey.length : 0;
   
-  if (!apiKey || apiKey.length < 20) {
-    console.error('[OTP] ERROR: Invalid or missing Brevo API Key in EMAIL_PASS');
-    throw new Error('Invalid Mail Configuration');
+  console.log(`[OTP] Sending ${otp} to ${email} via Brevo API (Key Length: ${keyLength})...`);
+  
+  if (!apiKey) {
+    console.error('[OTP] ERROR: Missing Brevo API Key in EMAIL_PASS');
+    throw new Error('Missing Mail Configuration');
   }
 
   try {
