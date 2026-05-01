@@ -209,13 +209,19 @@ exports.updateMerchantStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, isVerified } = req.body;
-    const updateData = {};
-    if (status) updateData.status = status;
-    if (isVerified !== undefined) updateData.isVerified = isVerified;
     
-    const restaurant = await Restaurant.findByIdAndUpdate(id, updateData, { new: true });
+    const restaurant = await Restaurant.findById(id);
+    if (!restaurant) {
+      return res.status(404).json({ message: 'Merchant not found' });
+    }
+
+    if (status) restaurant.status = status;
+    if (isVerified !== undefined) restaurant.isVerified = isVerified;
+    
+    await restaurant.save();
     res.status(200).json({ message: `Account updated successfully`, restaurant });
   } catch (error) {
+    console.error(`[SuperAdmin] Status update error:`, error.message);
     res.status(500).json({ message: 'Update failed', error: error.message });
   }
 };
